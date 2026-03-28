@@ -28,9 +28,7 @@ fpp_playing = Gauge("fpp_playing", "1 if something is currently playing")
 fpp_playlist_name = Info("fpp_current_playlist", "Currently active playlist")
 fpp_sequence_name = Info("fpp_current_sequence", "Currently active sequence")
 
-fpp_cpu_usage = Gauge("fpp_cpu_usage_percent", "FPP host CPU usage %")
-fpp_memory_usage = Gauge("fpp_memory_usage_percent", "FPP host memory usage %")
-fpp_disk_free = Gauge("fpp_disk_free_bytes", "Free disk space in bytes")
+fpp_cpu_temp = Gauge("fpp_cpu_temp_celsius", "FPP CPU temperature in Celsius")
 
 
 def collect(host: str) -> None:
@@ -53,10 +51,9 @@ def collect(host: str) -> None:
     fpp_playlist_name.info({"name": current.get("playlist", "")})
     fpp_sequence_name.info({"name": s.get("current_sequence", "")})
 
-    sensors = s.get("sensors", {})
-    fpp_cpu_usage.set(sensors.get("cpu", {}).get("load", 0))
-    fpp_memory_usage.set(sensors.get("memory", {}).get("percentage", 0))
-    fpp_disk_free.set(sensors.get("disk", {}).get("freeBytes", 0))
+    for sensor in s.get("sensors", []):
+        if sensor.get("valueType") == "Temperature" and "CPU" in sensor.get("label", ""):
+            fpp_cpu_temp.set(sensor.get("value", 0))
 
 
 @click.command()
