@@ -6,3 +6,9 @@ dist/
 .ruff_cache/
 .pytest_cache/
 *.egg-info
+
+# macOS
+.DS_Store
+
+# Generated/uploaded media assets, not used by the code
+images/

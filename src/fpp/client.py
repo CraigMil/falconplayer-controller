@@ -90,7 +90,10 @@ class FPPClient:
     def _get(self, path: str) -> dict:
         resp = self._http.get(path)
         resp.raise_for_status()
-        return resp.json()
+        try:
+            return resp.json()
+        except Exception:
+            return {}
 
     def _put(self, path: str, body: dict) -> dict:
         resp = self._http.put(path, json=body)
