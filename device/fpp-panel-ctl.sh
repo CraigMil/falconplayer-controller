@@ -23,22 +23,34 @@ case "$SVCKEY" in
   *) echo "unknown service: $SVCKEY" >&2; exit 1 ;;
 esac
 
+# Only ONE display service may own the panel. Both drive it on a loop and
+# rebuild their own playlists, so leaving the other running means the two fight
+# and the display flickers between them every few seconds.
+stand_down_others() {
+  for other in fpp-worldclock.service fpp-scoreboard.service; do
+    [ "$other" = "$SVC" ] && continue
+    sudo /usr/bin/systemctl stop "$other" 2>/dev/null || true
+  done
+}
+
 case "$ACTION" in
   start)
-    # Only ONE of these may own the panel. Both drive it on a loop, so leaving
-    # the other running means the two fight and the display flickers between
-    # them every few seconds.
-    for other in fpp-worldclock.service fpp-scoreboard.service; do
-      [ "$other" = "$SVC" ] && continue
-      sudo /usr/bin/systemctl stop "$other" 2>/dev/null || true
-    done
+    stand_down_others
     sudo /usr/bin/systemctl start "$SVC"
     ;;
   stop)
     sudo /usr/bin/systemctl stop "$SVC"
     "$FPP_BIN" --host 127.0.0.1 stop
     ;;
-  restart)   sudo /usr/bin/systemctl restart "$SVC" ;;
+  restart)
+    # restart has to stand the others down too. It did not, and when a second
+    # display service arrived that became a live bug: restarting the world
+    # clock while the scoreboard was running left BOTH units active and the
+    # panel flipping between fpp-worldclock-a and fpp-scoreboard every few
+    # seconds. "Restart X" plainly means X should be the thing on the panel.
+    stand_down_others
+    sudo /usr/bin/systemctl restart "$SVC"
+    ;;
   enable)    sudo /usr/bin/systemctl enable  "$SVC" ;;
   disable)   sudo /usr/bin/systemctl disable "$SVC" ;;
   status)    sudo /usr/bin/systemctl is-active "$SVC" ;;
