@@ -49,8 +49,21 @@ GET  /status
 GET  /scoreboard/status
 ```
 
-Services: `worldclock`, `scoreboard`. Actions: `start`, `stop`, `restart`,
-`status`. `sudo` is limited to exactly these units in `/etc/sudoers.d/`.
+Services: `worldclock`, `scoreboard`, `current`. Actions: `start`, `stop`,
+`restart`, `status`. `sudo` is limited to exactly these units in
+`/etc/sudoers.d/`.
+
+**`current` is not a unit.** It resolves at call time to whichever display
+service is live, or — when neither is — to the animation playlist FPP is
+playing. `POST /current/restart` is therefore "unstick whatever is on the panel
+without changing what is on it", which is the one repair `start` cannot make:
+`systemctl start` on an already-active unit is a no-op, so a service that is up
+but wedged can only be recovered by restarting it. `GET /current/status` answers
+`worldclock`, `scoreboard`, `playlist:<name>` or `idle`.
+
+Resolving on the device matters. Home Assistant's sensors are up to 15s stale,
+so deciding there which service to restart can cheerfully restart the one that
+was running a quarter of a minute ago.
 
 The bare one-segment paths are kept because Home Assistant has called them that
 way since the server was written, and renaming them would have meant a

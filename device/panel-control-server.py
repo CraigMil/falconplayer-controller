@@ -2,8 +2,10 @@
 
     POST /start                     # world clock — the original form
     POST /scoreboard/start          # any registered service
+    POST /current/restart           # kick whatever is live, whatever it is
     GET  /status
     GET  /scoreboard/status
+    GET  /current/status
 
 The one-segment paths are kept exactly as they were. Home Assistant has been
 calling POST /start and GET /status since this was written, and a rename would
@@ -25,7 +27,9 @@ TOKEN_FILE = os.environ.get("WORLDCLOCK_TOKEN_FILE", "/home/fpp/.worldclock-cont
 PORT = int(os.environ.get("WORLDCLOCK_CONTROL_PORT", "8090"))
 
 _ACTIONS = {"start", "stop", "restart", "status"}
-_SERVICES = {"worldclock", "scoreboard"}
+# "current" is not a unit — the ctl script resolves it to whichever display
+# service is live, or to the playing playlist when neither is.
+_SERVICES = {"worldclock", "scoreboard", "current"}
 _DEFAULT_SERVICE = "worldclock"
 
 
