@@ -566,32 +566,69 @@ _SCOREBOARD_PLAYLIST = "fpp-scoreboard"
 @main.command("scoreboard")
 @click.option(
     "--league",
-    default="all",
+    default="epl",
     show_default=True,
     type=click.Choice(["epl", "ucl", "all"]),
     help="League to display (epl, ucl, or all)",
 )
 @click.option(
     "--interval",
-    default=20,
+    default=15,
     show_default=True,
     type=float,
     metavar="SECONDS",
     help="Seconds each game is shown before cycling to the next.",
 )
+@click.option(
+    "--max-cards",
+    default=12,
+    show_default=True,
+    type=int,
+    help="Cap on cards per cycle. A whole matchday plus fixtures runs long.",
+)
+@click.option(
+    "--refresh",
+    default=60,
+    show_default=True,
+    type=float,
+    metavar="SECONDS",
+    help="Minimum seconds between refetches when nothing is live.",
+)
 @click.pass_context
-def scoreboard(ctx: click.Context, league: str, interval: float) -> None:
+def scoreboard(ctx: click.Context, league: str, interval: float,
+               max_cards: int, refresh: float) -> None:
     """Display a live soccer scoreboard on the LED panel.
 
-    Renders each game as a JPEG, uploads to FPP, and plays them as a looping
-    playlist. Scores are re-fetched and the playlist rebuilt on each full cycle.
+    Each card is one game: club colours and shields, the score if it is live or
+    finished, and WHEN BOTH OF THOSE TEAMS PLAY NEXT.
+
+    When no game is in progress — which is most of the time, since a league
+    plays about six hours a week — it falls back to the most recent matchday's
+    results followed by the next matchday's fixtures, so the panel is still
+    saying something at 3am on a Wednesday.
+
+    Renders each card as a JPEG, uploads to FPP, and plays them as a looping
+    playlist, rebuilt on each full cycle.
     """
-    from .displays.soccer import LEAGUES, fetch_all, fetch_games, render_no_games, render_scoreboard
+    from .displays.soccer import (
+        LEAGUES, attach_next, fetch_fixtures, render_no_games, render_scoreboard,
+        select_cards,
+    )
 
     host = ctx.obj["host"]
+    keys = list(LEAGUES) if league == "all" else [league]
 
-    def _fetch() -> list[dict]:
-        return fetch_all() if league == "all" else fetch_games(league)
+    def _fetch() -> tuple[list[dict], str]:
+        games, reason = select_cards(keys, max_cards=max_cards)
+        # Next fixtures come from a wider net than the cards do: a Premier
+        # League side's next match is often a European one, and answering
+        # "when do they play next" with the wrong competition is worse than
+        # not answering.
+        try:
+            attach_next(games, fetch_fixtures(list(LEAGUES)))
+        except Exception as exc:
+            click.echo(f"  (no next-fixture data: {exc})")
+        return games, reason
 
     def _build_and_play(fpp: FPPClient, games: list[dict]) -> None:
         """Upload rendered frames and (re)start the scoreboard playlist."""
@@ -639,24 +676,39 @@ def scoreboard(ctx: click.Context, league: str, interval: float) -> None:
             "leadOut": [],
         }
         pl_json = _json.dumps(playlist, indent=4)
+        # -T and a swallowed stderr: without them the device's MOTD ("Raspbian
+        # GNU/Linux 12", "Falcon Player OS Image...") lands in the middle of the
+        # scoreboard's own output every cycle and reads like an error.
         subprocess.run(
-            ["ssh", f"fpp@{host}",
+            ["ssh", "-T", "-o", "LogLevel=ERROR", f"fpp@{host}",
              f"cat > /home/fpp/media/playlists/{_SCOREBOARD_PLAYLIST}.json"],
             input=pl_json.encode(),
             check=True,
+            stderr=subprocess.DEVNULL,
         )
         fpp.start_playlist(_SCOREBOARD_PLAYLIST, repeat=True)
+
+    _REASONS = {
+        "live":  "live now",
+        "today": "today's games",
+        "idle":  "last results + next fixtures",
+    }
 
     click.echo(f"Fetching scores ({league.upper()})...")
     try:
         while True:
-            games = _fetch()
+            games, reason = _fetch()
             n = len(games)
-            click.echo(f"Building scoreboard — {n} game{'s' if n != 1 else ''}  ({interval}s each)")
+            click.echo(f"Building scoreboard — {n} card{'s' if n != 1 else ''} "
+                       f"[{_REASONS.get(reason, reason)}]  ({interval}s each)")
             with _client(host) as fpp:
                 _build_and_play(fpp, games)
 
             cycle_secs = max(len(games), 1) * interval
+            # Nothing is live: results and fixtures do not change minute to
+            # minute, so do not hammer ESPN once a short cycle comes round.
+            if reason != "live":
+                cycle_secs = max(cycle_secs, refresh)
             click.echo(f"Playing — next refresh in {cycle_secs:.0f}s  (Ctrl+C to stop)")
             time.sleep(cycle_secs)
 
