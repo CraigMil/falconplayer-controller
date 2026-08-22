@@ -1,0 +1,14 @@
+[Unit]
+Description=Falcon Player World Clock Control API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fpp
+ExecStart=/home/fpp/fpp-worldclock-venv/bin/python3 /home/fpp/panel-control-server.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

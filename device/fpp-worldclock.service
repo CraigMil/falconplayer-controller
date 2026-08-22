@@ -1,0 +1,15 @@
+[Unit]
+Description=Falcon Player World Clock Display
+After=network-online.target fpp.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fpp
+Environment=FPP_HOST=127.0.0.1
+ExecStart=/home/fpp/fpp-worldclock-venv/bin/fpp --host 127.0.0.1 worldclock --interval 15 --count 6
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
