@@ -662,7 +662,6 @@ def scoreboard(ctx: click.Context, league: str, interval: float,
                 entries += [_image_entry(img_name), _pause_entry(interval)]
 
         import json as _json
-        import subprocess
         playlist = {
             "name": _SCOREBOARD_PLAYLIST,
             "version": 4,
@@ -675,17 +674,11 @@ def scoreboard(ctx: click.Context, league: str, interval: float,
             "mainPlaylist": entries,
             "leadOut": [],
         }
-        pl_json = _json.dumps(playlist, indent=4)
-        # -T and a swallowed stderr: without them the device's MOTD ("Raspbian
-        # GNU/Linux 12", "Falcon Player OS Image...") lands in the middle of the
-        # scoreboard's own output every cycle and reads like an error.
-        subprocess.run(
-            ["ssh", "-T", "-o", "LogLevel=ERROR", f"fpp@{host}",
-             f"cat > /home/fpp/media/playlists/{_SCOREBOARD_PLAYLIST}.json"],
-            input=pl_json.encode(),
-            check=True,
-            stderr=subprocess.DEVNULL,
-        )
+        # Via _write_playlist_json, which writes the file directly when we are
+        # already ON the device. This runs as a systemd unit there with
+        # --host 127.0.0.1, and the old inline ssh call meant the scoreboard
+        # service could only work if the box could SSH to itself.
+        _write_playlist_json(host, _SCOREBOARD_PLAYLIST, _json.dumps(playlist, indent=4))
         fpp.start_playlist(_SCOREBOARD_PLAYLIST, repeat=True)
 
     _REASONS = {
@@ -729,10 +722,15 @@ def _write_playlist_json(host: str, name: str, pl_json: str) -> None:
         Path(f"/home/fpp/media/playlists/{name}.json").write_text(pl_json)
     else:
         import subprocess
+        # -T and a swallowed stderr: without them the device MOTD ("Raspbian
+        # GNU/Linux 12", "Falcon Player OS Image...") lands in the middle of a
+        # display loop's own output every cycle and reads like an error.
         subprocess.run(
-            ["ssh", f"fpp@{host}", f"cat > /home/fpp/media/playlists/{name}.json"],
+            ["ssh", "-T", "-o", "LogLevel=ERROR", f"fpp@{host}",
+             f"cat > /home/fpp/media/playlists/{name}.json"],
             input=pl_json.encode(),
             check=True,
+            stderr=subprocess.DEVNULL,
         )
 
 

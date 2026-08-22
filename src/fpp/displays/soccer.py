@@ -368,10 +368,15 @@ def _next_row(frame: Frame, y: int, abbr: str, colour: Color, nxt: dict | None) 
                    color=(95, 95, 95), anchor="lm")
         return
 
+    # Laid out from the MEASURED width of the abbreviation, not a fixed column.
+    # Three-letter codes are not three equal widths — "MAN" ran into a separator
+    # parked at x=48 while "SUN" cleared it easily.
+    x = 14 + frame.text_width(abbr, 11) + 7
     # "v" for home, "@" for away — three characters of context for one glyph.
     sep = "v" if nxt["home"] else "@"
-    frame.text(48, y + 11, sep, size=10, color=(120, 120, 120), anchor="mm")
-    frame.text(58, y + 11, nxt["opponent"], size=11, color=(215, 215, 215), anchor="lm")
+    frame.text(x, y + 11, sep, size=10, color=(120, 120, 120), anchor="lm")
+    x += frame.text_width(sep, 10) + 7
+    frame.text(x, y + 11, nxt["opponent"], size=11, color=(215, 215, 215), anchor="lm")
     frame.text(188, y + 11, nxt["when"], size=10, color=(150, 150, 150), anchor="rm")
 
 
