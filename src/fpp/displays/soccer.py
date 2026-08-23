@@ -30,6 +30,30 @@ LEAGUES: dict[str, tuple[str, str]] = {
 FIXTURE_DAYS = 35        # how far ahead to look for "next game"
 LOOKBACK_DAYS = 14       # how far back to look for the last results
 
+# The card list is a WEEK, not a day. Filtering results to the newest calendar
+# date looked like "the last matchday" and is not one: a Premier League round is
+# spread over two or three days (Jan 2026 ran Sat 3rd + Sun 4th, then Tue 6th +
+# Wed 7th + Thu 8th), so a single date shows a slice of a round and leaves most
+# of the league off the panel entirely. A seven-day block covers a whole round.
+#
+# BLOCK_ANCHOR is TUESDAY, and the day it starts on matters more than the length
+# does. Measured over all 380 fixtures of 2025-26, counting clubs represented on
+# every day of the season:
+#
+#     block starts   mean clubs   worst   all 20 on
+#     Mon                  18.8      16     45% of days
+#     Tue                  19.8      16     94% of days
+#     Wed                  19.3      12     86% of days
+#     Thu                  18.2       2     86% of days
+#     Sun                  14.6       6     13% of days
+#
+# A Monday start splits Monday Night Football away from the weekend round it
+# belongs to, so the block clips one game off that round and picks up an orphan
+# from the next. Tue -> Mon holds a round whole: midweek Tuesday and Wednesday,
+# the Saturday and Sunday programme, and MNF closing it out.
+BLOCK_ANCHOR = 1         # 0 = Monday, so 1 = Tuesday
+BLOCK_DAYS = 7
+
 
 # ------------------------------------------------------------------ data fetch
 
@@ -105,8 +129,96 @@ def _scoreboard_json(slug: str, dates: str | None = None) -> dict:
     return resp.json()
 
 
+STANDINGS_BASE = "https://site.api.espn.com/apis/v2/sports/soccer"
+
+# The table is split across two cards because ten rows is what fits legibly in
+# 192px once the header and the key have taken their share.
+TABLE_ROWS = 10
+
+
+def fetch_standings(league_key: str) -> list[dict]:
+    """The league table, one row per club, in rank order.
+
+    The qualification bands come from ESPN's own per-entry `note`, NOT from
+    hard-coded positions. England's Champions League allocation is five places
+    in some seasons and four in others — it depends on a UEFA coefficient
+    settled during the season — and the Europa place moves whenever a cup
+    winner has already qualified by league position. Anything written down here
+    would be wrong within a year and wrong silently.
+
+    Their colours arrive malformed: the Europa band is "##B5E7CE", with two
+    hashes. `_hex()` strips them all, which is the only reason this works.
+    """
+    slug, _ = LEAGUES[league_key]
+    resp = httpx.get(f"{STANDINGS_BASE}/{slug}/standings", timeout=15)
+    resp.raise_for_status()
+    data = resp.json()
+
+    groups = data.get("children") or []
+    entries = (groups[0].get("standings", {}) if groups else data.get("standings", {})).get("entries", [])
+
+    rows: list[dict] = []
+    for entry in entries:
+        stat = {x.get("name"): x.get("displayValue", "") for x in entry.get("stats", [])}
+        note = entry.get("note") or {}
+        team = entry.get("team", {})
+        rows.append({
+            "rank":   int(stat.get("rank") or 0),
+            "abbr":   team.get("abbreviation", "???"),
+            "name":   team.get("shortDisplayName", ""),
+            "played": stat.get("gamesPlayed", "0"),
+            "gd":     stat.get("pointDifferential", "0"),
+            "points": stat.get("points", "0"),
+            "band":   note.get("description", ""),
+            "band_color": _hex(note.get("color", "")) if note.get("color") else None,
+        })
+    rows.sort(key=lambda r: r["rank"])
+    return rows
+
+
+def table_cards(league_key: str) -> list[dict]:
+    """The two table cards, or nothing at all if the standings cannot be had.
+
+    Returning [] on failure rather than raising is deliberate: a table is a
+    nice-to-have on a scoreboard, and an ESPN hiccup should cost you the table,
+    not the scores.
+    """
+    try:
+        rows = fetch_standings(league_key)
+    except Exception:
+        return []
+    if not rows:
+        return []
+    _, label = LEAGUES[league_key]
+    out = []
+    for start in range(0, len(rows), TABLE_ROWS):
+        chunk = rows[start:start + TABLE_ROWS]
+        out.append({
+            "kind":  "table",
+            "league_label": label,
+            "rows":  chunk,
+            "range": f"{chunk[0]['rank']}-{chunk[-1]['rank']}",
+            "bands": [r for r in rows if r["band"]],
+        })
+    return out
+
+
 def _daterange(start: datetime, end: datetime) -> str:
     return f"{start:%Y%m%d}-{end:%Y%m%d}"
+
+
+def _block_bounds(now: datetime | None = None) -> tuple[datetime, datetime]:
+    """The Tue->Mon block containing `now`, as local midnight boundaries.
+
+    Local, not UTC: a Monday night kickoff at 20:00 UK is Tuesday in UTC, and
+    on a UTC boundary it would fall into the following week away from the round
+    it belongs to — the exact failure BLOCK_ANCHOR exists to avoid.
+    """
+    local = (now or datetime.now(timezone.utc)).astimezone()
+    back = (local.weekday() - BLOCK_ANCHOR) % 7
+    start = (local - timedelta(days=back)).replace(
+        hour=0, minute=0, second=0, microsecond=0)
+    return start, start + timedelta(days=BLOCK_DAYS)
 
 
 def fetch_fixtures(league_keys: list[str], days: int = FIXTURE_DAYS) -> list[dict]:
@@ -246,28 +358,45 @@ def fetch_all(dates: str | None = None) -> list[dict]:
     return games
 
 
-def select_cards(league_keys: list[str], max_cards: int = 12) -> tuple[list[dict], str]:
+def select_cards(league_keys: list[str], max_cards: int = 24) -> tuple[list[dict], str]:
     """What the panel should show right now, and a one-word reason.
 
-    Most of the time no match is in progress — a league plays for about six
-    hours a week — so "live scores" alone would leave the panel blank almost
-    always. The fallback is the last matchday's results followed by the next
-    matchday's fixtures, which keeps it saying something useful at 3am on a
-    Wednesday.
+    One card per game in the current Tue->Mon block, in kickoff order, so the
+    week reads forwards: results first, then what is still to come. Every club
+    that plays this week gets a card, and each card carries both sides' next
+    fixture, which is how a team that has already played is still told to you.
+
+    Ordering is chronological with one exception — anything LIVE goes first.
+    A game in progress is the only thing on the panel that changes while you
+    watch it, and burying it behind Tuesday's result wastes it.
+
+    The block is empty for about 35 days a season (international breaks). Then,
+    and only then, it falls back to the last results plus the next fixtures, so
+    the panel still says something useful during a fortnight with no football.
     """
-    today: list[dict] = []
+    now = datetime.now(timezone.utc)
+    start, end = _block_bounds(now)
+    span = _daterange(start, end)
+
+    block: list[dict] = []
     for key in league_keys:
         try:
-            today.extend(fetch_games(key))
+            block.extend(fetch_games(key, span))
         except Exception:
             pass
 
-    live = [g for g in today if g["state"] == "in"]
-    if live:
-        rest = [g for g in today if g["state"] != "in"]
-        return (live + rest)[:max_cards], "live"
+    # ESPN answers a date range generously at the edges — it has returned games
+    # from the day either side — so the window is re-applied here rather than
+    # trusted. Without it a Monday-night game leaks in from the block just gone.
+    block = [g for g in block
+             if (k := _kickoff(g["kickoff"])) and start <= k.astimezone() < end]
 
-    now = datetime.now(timezone.utc)
+    if block:
+        block.sort(key=lambda g: g["kickoff"])
+        live = [g for g in block if g["state"] == "in"]
+        rest = [g for g in block if g["state"] != "in"]
+        return (live + rest)[:max_cards], "week"
+
     past = _daterange(now - timedelta(days=LOOKBACK_DAYS), now)
     ahead = _daterange(now, now + timedelta(days=LOOKBACK_DAYS))
 
@@ -283,24 +412,10 @@ def select_cards(league_keys: list[str], max_cards: int = 12) -> tuple[list[dict
         except Exception:
             pass
 
-    # Only the MOST RECENT matchday, not a fortnight of them — otherwise a
-    # midweek cycle runs for ten minutes and nothing on it is news.
-    if recent:
-        recent.sort(key=lambda g: g["kickoff"], reverse=True)
-        newest = (_kickoff(recent[0]["kickoff"]) or now).date()
-        recent = [g for g in recent
-                  if (_kickoff(g["kickoff"]) or now).date() == newest]
-        recent.reverse()
-    if upcoming:
-        upcoming.sort(key=lambda g: g["kickoff"])
-        soonest = (_kickoff(upcoming[0]["kickoff"]) or now).date()
-        upcoming = [g for g in upcoming
-                    if (_kickoff(g["kickoff"]) or now).date() == soonest]
-
-    if today and not recent and not upcoming:
-        return today[:max_cards], "today"
+    recent.sort(key=lambda g: g["kickoff"])
+    upcoming.sort(key=lambda g: g["kickoff"])
     half = max(1, max_cards // 2)
-    return (recent[:half] + upcoming[:max_cards - len(recent[:half])]), "idle"
+    return (recent[-half:] + upcoming[:max_cards - half]), "idle"
 
 
 # ------------------------------------------------------------------ rendering
@@ -423,14 +538,16 @@ def render_scoreboard(game: dict) -> Frame:
         clock_text = _when(game.get("kickoff", "")) or game["detail"][:24]
         clock_col = (200, 200, 200)
     elif state == "in":
-        clock_text = f"{_half_period(game['period'])}  {game['clock']}"
+        # period_label lets another sport supply its own reading of `period` —
+        # the NFL module sends "Q3" where this would have said "2nd half".
+        clock_text = f"{game.get('period_label') or _half_period(game['period'])}  {game['clock']}"
         clock_col = (120, 255, 140)      # live is the one thing worth a colour
     else:
         clock_text = game["short"]
         clock_col = (200, 200, 200)
 
     league_line = game["league_label"]
-    if game["leg"]:
+    if game.get("leg"):
         league_line += f" · {game['leg']}"
     if state == "post" and game.get("game_date"):
         league_line += f" · {game['game_date']}"
@@ -457,6 +574,98 @@ def render_scoreboard(game: dict) -> Frame:
                   game.get("home_next"))
 
     return frame
+
+
+# --- league table card -------------------------------------------------------
+# 192px of height, spent: 17 header, 10 rows of 15, 25 for the key. Ten rows is
+# the most that stays legible — at twelve the row is 12px and the abbreviation
+# and the points column start to touch.
+TBL_HEAD_H = 17
+TBL_ROW_H = 15
+TBL_KEY_H = 25
+TBL_BAR_W = 3            # left edge colour bar marking a qualification band
+
+# Column right edges, tuned so PTS never collides with GD on "-10" or "+10".
+TBL_X_POS = 17           # position number, right-aligned
+TBL_X_ABBR = 23          # club abbreviation, left-aligned
+TBL_X_PL = 128           # played
+TBL_X_GD = 158           # goal difference
+TBL_X_PTS = 187          # points
+
+
+def _band_kind(desc: str) -> str:
+    """Collapse ESPN's wording to the three things a row can be."""
+    d = (desc or "").lower()
+    if "relegation" in d:
+        return "rel"
+    if "champions" in d:
+        return "ucl"
+    if "europa" in d or "conference" in d:
+        return "uel"
+    return ""
+
+
+def render_table(card: dict) -> Frame:
+    """One half of the league table.
+
+    Relegation is a filled RED row, as the strongest signal on the card — going
+    down is the thing you want to read at a glance from across a room. European
+    qualification is a colour bar down the left edge plus a faint wash, which
+    reads as "marked" without competing with it.
+    """
+    frame = Frame(bg=(8, 8, 8))
+
+    frame.text(4, 8, card["league_label"].upper(), size=9,
+               color=(120, 120, 120), anchor="lm")
+    frame.text(188, 8, card["range"], size=10, color=(200, 200, 200), anchor="rm")
+    frame.line(0, TBL_HEAD_H - 1, 191, TBL_HEAD_H - 1, color=(45, 45, 45), width=1)
+
+    for i, row in enumerate(card["rows"]):
+        y = TBL_HEAD_H + i * TBL_ROW_H
+        kind = _band_kind(row["band"])
+        colour = row["band_color"] or (90, 90, 90)
+
+        if kind == "rel":
+            frame.rect(0, y, 192, TBL_ROW_H, dim(colour, 0.62, floor=40))
+        elif i % 2 == 0:
+            frame.rect(0, y, 192, TBL_ROW_H, (17, 17, 17))
+        if kind in ("ucl", "uel"):
+            frame.rect(0, y, 192, TBL_ROW_H, dim(colour, 0.16, floor=10))
+            frame.rect(0, y, TBL_BAR_W, TBL_ROW_H, colour)
+
+        mid = y + TBL_ROW_H // 2
+        pos_col = (235, 235, 235) if kind == "rel" else (135, 135, 135)
+        frame.text(TBL_X_POS, mid, str(row["rank"]), size=10, color=pos_col, anchor="rm")
+        frame.text(TBL_X_ABBR, mid, row["abbr"], size=12, color=(255, 255, 255), anchor="lm")
+        frame.text(TBL_X_PL, mid, str(row["played"]), size=9, color=(120, 120, 120), anchor="rm")
+        frame.text(TBL_X_GD, mid, str(row["gd"]), size=9, color=(165, 165, 165), anchor="rm")
+        frame.text(TBL_X_PTS, mid, str(row["points"]), size=12, color=(255, 255, 255), anchor="rm")
+
+    # The key. Built from the bands actually present in THIS season's table, so
+    # a year when England has five Champions League places, or no Conference
+    # place at all, labels itself correctly with no edit here.
+    ky = 192 - TBL_KEY_H
+    frame.line(0, ky, 191, ky, color=(45, 45, 45), width=1)
+    seen: dict[str, tuple] = {}
+    for row in card["bands"]:
+        k = _band_kind(row["band"])
+        if k and k not in seen:
+            seen[k] = (row["band_color"] or (90, 90, 90), _KEY_LABEL.get(k, k.upper()))
+
+    if seen:
+        slot = 192 // len(seen)
+        for j, (k, (colour, label)) in enumerate(seen.items()):
+            cx = j * slot + 4
+            cy = ky + TBL_KEY_H // 2
+            frame.rect(cx, cy - 4, 8, 8, colour)
+            # text_fit, not text: "RELEGATION" overruns its slot at size 9 and
+            # the last card in the cycle then reads "RELEGATIO".
+            frame.text_fit(cx + 12, cy, label, max_width=slot - 17,
+                           size=9, min_size=6, color=(185, 185, 185), anchor="lm")
+    return frame
+
+
+_KEY_LABEL = {"ucl": "UCL", "uel": "EUROPA", "rel": "RELEGATION"}
 
 
 def render_no_games(league_key: str) -> Frame:

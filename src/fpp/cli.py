@@ -568,8 +568,8 @@ _SCOREBOARD_PLAYLIST = "fpp-scoreboard"
     "--league",
     default="epl",
     show_default=True,
-    type=click.Choice(["epl", "ucl", "all"]),
-    help="League to display (epl, ucl, or all)",
+    type=click.Choice(["epl", "ucl", "nfl", "all"]),
+    help="League to display. 'all' is the two soccer competitions; nfl stands alone.",
 )
 @click.option(
     "--interval",
@@ -581,10 +581,26 @@ _SCOREBOARD_PLAYLIST = "fpp-scoreboard"
 )
 @click.option(
     "--max-cards",
-    default=12,
+    default=24,
     show_default=True,
     type=int,
-    help="Cap on cards per cycle. A whole matchday plus fixtures runs long.",
+    help="Cap on cards per cycle. A full week is ~10 and peaks at 20.",
+)
+@click.option(
+    "--cycle",
+    default=180.0,
+    show_default=True,
+    type=float,
+    metavar="SECONDS",
+    help="Target length of one full pass. Busy weeks shorten the dwell to fit.",
+)
+@click.option(
+    "--min-interval",
+    default=6.0,
+    show_default=True,
+    type=float,
+    metavar="SECONDS",
+    help="Floor on per-card dwell, however many cards there are.",
 )
 @click.option(
     "--refresh",
@@ -594,31 +610,69 @@ _SCOREBOARD_PLAYLIST = "fpp-scoreboard"
     metavar="SECONDS",
     help="Minimum seconds between refetches when nothing is live.",
 )
+@click.option(
+    "--table/--no-table",
+    default=True,
+    show_default=True,
+    help="Close each lap with standings (soccer) or stat leaders (NFL).",
+)
 @click.pass_context
 def scoreboard(ctx: click.Context, league: str, interval: float,
-               max_cards: int, refresh: float) -> None:
+               max_cards: int, cycle: float, min_interval: float,
+               refresh: float, table: bool) -> None:
     """Display a live soccer scoreboard on the LED panel.
 
     Each card is one game: club colours and shields, the score if it is live or
     finished, and WHEN BOTH OF THOSE TEAMS PLAY NEXT.
 
-    When no game is in progress — which is most of the time, since a league
-    plays about six hours a week — it falls back to the most recent matchday's
-    results followed by the next matchday's fixtures, so the panel is still
-    saying something at 3am on a Wednesday.
+    The cards are the current Tue-to-Mon week, in kickoff order: what has been
+    played so far, then what is still to come, with anything live pulled to the
+    front. That way every club playing this week is on the panel, which showing
+    a single day's fixtures never managed. During an international break the
+    week is empty and it falls back to the last results plus the next fixtures.
+
+    --interval is the per-card dwell when there is room for it. A week peaks at
+    twenty cards, and twenty times fifteen seconds is a five-minute lap, so the
+    dwell SHRINKS to fit --cycle when the week is busy. It never stretches past
+    --interval on a quiet week, and never drops below --min-interval.
+
+    Each soccer lap ends with the league table, split 1-10 and 11-20: relegation
+    rows filled red, European qualification marked with a colour bar and named
+    in the key. The bands come from ESPN rather than from fixed positions,
+    because how many Champions League places England gets changes season to
+    season.
+
+    --league nfl shows every game of the current NFL week — the scoreboard
+    endpoint reports the week itself, so there is no date arithmetic — and ends
+    the lap with three leaderboards: quarterbacks by Total QBR, running backs by
+    yards from scrimmage, wide receivers by receiving yards.
 
     Renders each card as a JPEG, uploads to FPP, and plays them as a looping
     playlist, rebuilt on each full cycle.
     """
+    from . displays import nfl as _nfl
     from .displays.soccer import (
         LEAGUES, attach_next, fetch_fixtures, render_no_games, render_scoreboard,
-        select_cards,
+        render_table, select_cards, table_cards,
     )
 
     host = ctx.obj["host"]
-    keys = list(LEAGUES) if league == "all" else [league]
+    keys = list(LEAGUES) if league == "all" else ([] if league == "nfl" else [league])
+
+    def _fetch_nfl() -> tuple[list[dict], str]:
+        """The NFL week, plus the three leaderboards on the end of the lap."""
+        games, reason = _nfl.select_cards(max_cards=max_cards)
+        try:
+            _nfl.attach_next(games, _nfl.fetch_fixtures())
+        except Exception as exc:
+            click.echo(f"  (no next-game data: {exc})")
+        if table:
+            games = games + _nfl.leader_cards()
+        return games, reason
 
     def _fetch() -> tuple[list[dict], str]:
+        if league == "nfl":
+            return _fetch_nfl()
         games, reason = select_cards(keys, max_cards=max_cards)
         # Next fixtures come from a wider net than the cards do: a Premier
         # League side's next match is often a European one, and answering
@@ -628,9 +682,14 @@ def scoreboard(ctx: click.Context, league: str, interval: float,
             attach_next(games, fetch_fixtures(list(LEAGUES)))
         except Exception as exc:
             click.echo(f"  (no next-fixture data: {exc})")
+        # The table goes on the END of the lap, after the football that produced
+        # it. Only for a real league — "all" mixes two competitions on one
+        # panel and there is no single table that means anything across them.
+        if table and league != "all":
+            games = games + table_cards(league)
         return games, reason
 
-    def _build_and_play(fpp: FPPClient, games: list[dict]) -> None:
+    def _build_and_play(fpp: FPPClient, games: list[dict], dwell: float) -> None:
         """Upload rendered frames and (re)start the scoreboard playlist."""
         entries = []
 
@@ -649,17 +708,26 @@ def scoreboard(ctx: click.Context, league: str, interval: float,
 
         if not games:
             img_name = "fpp-scoreboard-0.jpg"
-            data = render_no_games(league if league != "all" else "epl").to_image_bytes()
+            data = (_nfl.render_no_games() if league == "nfl"
+                    else render_no_games(league if league != "all" else "epl")).to_image_bytes()
             fpp.upload_file("images", img_name, data)
-            entries += [_image_entry(img_name), _pause_entry(interval)]
+            entries += [_image_entry(img_name), _pause_entry(dwell)]
         else:
             for i, game in enumerate(games):
                 img_name = f"fpp-scoreboard-{i}.jpg"
-                data = render_scoreboard(game).to_image_bytes()
+                if game.get("kind") == "table":
+                    data = render_table(game).to_image_bytes()
+                    label = f"table {game['range']}"
+                elif game.get("kind") == "leaders":
+                    data = _nfl.render_leaders(game).to_image_bytes()
+                    label = f"leaders {game['title'].lower()}"
+                else:
+                    data = render_scoreboard(game).to_image_bytes()
+                    label = (f"{game['away_abbr']} {game['away_score']}–"
+                             f"{game['home_score']} {game['home_abbr']}")
                 fpp.upload_file("images", img_name, data)
-                label = f"{game['away_abbr']} {game['away_score']}–{game['home_score']} {game['home_abbr']}"
                 click.echo(f"  uploaded [{game['league_label']}] {label}")
-                entries += [_image_entry(img_name), _pause_entry(interval)]
+                entries += [_image_entry(img_name), _pause_entry(dwell)]
 
         import json as _json
         playlist = {
@@ -682,22 +750,30 @@ def scoreboard(ctx: click.Context, league: str, interval: float,
         fpp.start_playlist(_SCOREBOARD_PLAYLIST, repeat=True)
 
     _REASONS = {
+        "week":  "this week",
         "live":  "live now",
         "today": "today's games",
         "idle":  "last results + next fixtures",
     }
+
+    def _dwell(n: int) -> float:
+        """Per-card seconds: `interval`, shortened to fit `cycle` when crowded."""
+        if n <= 0:
+            return interval
+        return max(min_interval, min(interval, cycle / n))
 
     click.echo(f"Fetching scores ({league.upper()})...")
     try:
         while True:
             games, reason = _fetch()
             n = len(games)
+            dwell = _dwell(n)
             click.echo(f"Building scoreboard — {n} card{'s' if n != 1 else ''} "
-                       f"[{_REASONS.get(reason, reason)}]  ({interval}s each)")
+                       f"[{_REASONS.get(reason, reason)}]  ({dwell:.0f}s each)")
             with _client(host) as fpp:
-                _build_and_play(fpp, games)
+                _build_and_play(fpp, games, dwell)
 
-            cycle_secs = max(len(games), 1) * interval
+            cycle_secs = max(n, 1) * dwell
             # Nothing is live: results and fixtures do not change minute to
             # minute, so do not hammer ESPN once a short cycle comes round.
             if reason != "live":

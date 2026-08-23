@@ -1,0 +1,1 @@
+fpp ALL=(root) NOPASSWD: /usr/bin/systemctl start fpp-nfl.service, /usr/bin/systemctl stop fpp-nfl.service, /usr/bin/systemctl restart fpp-nfl.service, /usr/bin/systemctl enable fpp-nfl.service, /usr/bin/systemctl disable fpp-nfl.service, /usr/bin/systemctl is-active fpp-nfl.service

@@ -10,6 +10,8 @@ see the paths below.
 | `panel-control-server.py` | `/home/fpp/panel-control-server.py` |
 | `fpp-worldclock.service` | `/etc/systemd/system/` |
 | `fpp-scoreboard.service` | `/etc/systemd/system/` |
+| `fpp-nfl.service` | `/etc/systemd/system/` |
+| `sudoers-fpp-nfl` | `/etc/sudoers.d/fpp-nfl` (mode 0440, root:root) |
 | `fpp-worldclock-control.service` | `/etc/systemd/system/` |
 
 The Python package itself is an **editable install** at
@@ -22,11 +24,11 @@ tar -czf - src/fpp | ssh fpp@192.168.1.66 \
 ssh fpp@192.168.1.66 "/home/fpp/fpp-panel-ctl.sh scoreboard restart"
 ```
 
-## The two display services
+## The three display services
 
-`fpp-worldclock.service` and `fpp-scoreboard.service` are long-running loops that
-each drive the panel and **rebuild their own playlist every cycle**. Only one may
-run at a time — leaving both up makes them fight, and the display flickers
+`fpp-worldclock.service`, `fpp-scoreboard.service` (soccer) and `fpp-nfl.service`
+are long-running loops that each drive the panel and **rebuild their own playlist
+every cycle**. Only one may run at a time — leaving both up makes them fight, and the display flickers
 between them every few seconds. `fpp-panel-ctl.sh start` stops the other one
 first, so nothing else has to remember.
 
@@ -49,9 +51,17 @@ GET  /status
 GET  /scoreboard/status
 ```
 
-Services: `worldclock`, `scoreboard`, `current`. Actions: `start`, `stop`,
-`restart`, `status`. `sudo` is limited to exactly these units in
-`/etc/sudoers.d/`.
+Services: `worldclock`, `scoreboard`, `nfl`, `current`. Actions: `start`, `stop`,
+`restart`, `status`. There is a per-unit rule in `/etc/sudoers.d/` for each, but
+it is **documentation of intent, not a constraint** — `010_pi-nopasswd` grants
+`fpp` blanket `NOPASSWD: ALL`, so the narrow rules restrict nothing. Adding a
+service still means adding its rule, so that the day the blanket grant goes away
+nothing breaks.
+
+The scoreboard and NFL units are the same binary with a different `--league`,
+and they share the `fpp-scoreboard` playlist name and image files. That is safe
+only because one display service runs at a time; each rebuilds the playlist from
+scratch on start, so leftover images from the other are simply unreferenced.
 
 **`current` is not a unit.** It resolves at call time to whichever display
 service is live, or — when neither is — to the animation playlist FPP is
