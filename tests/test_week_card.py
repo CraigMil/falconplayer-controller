@@ -14,21 +14,27 @@ def test_it_renders_a_panel_sized_frame():
     assert img.size == (WIDTH, HEIGHT)
 
 
-@pytest.mark.parametrize("label", ["WEEK 3", "WEEK 18", "PRE WK 1",
-                                   "WILD CARD", "CONF CHAMP", "SUPER BOWL", "NFL"])
+@pytest.mark.parametrize("label", ["WEEK 3", "WEEK 18", "PRE WK 3", "PRESEASON",
+                                   "WILD CARD", "DIVISIONAL", "CONF CHAMP",
+                                   "SUPER BOWL", "PLAYOFFS", "NFL"])
 def test_every_label_fits_inside_the_panel(label):
-    """"CONF CHAMP" is 10 characters and must not run off the edge."""
-    frame = render_week_card(label)
-    assert frame.text_width(label, size=_size_used(frame, label)) <= WIDTH - 8
+    """"CONF CHAMP" is 10 characters and must not run off the edge.
+
+    Measures the actual rendered ink, not a re-derivation of the size
+    ladder — a hardcoded or reversed size would push the bbox to the
+    panel edge and fail this.
+    """
+    bbox = _ink_bbox(label)
+    assert bbox is not None
+    left, _, right, _ = bbox
+    assert left >= 2
+    assert right <= WIDTH - 2
 
 
-def _size_used(frame, label):
-    """The largest size the card would have chosen for this label."""
-    from fpp.displays.nfl import WEEK_CARD_SIZES
-    for size in WEEK_CARD_SIZES:
-        if frame.text_width(label, size) <= WIDTH - 8:
-            return size
-    return WEEK_CARD_SIZES[-1]
+def _ink_bbox(label):
+    """Bounding box of everything meaningfully lit on the rendered card."""
+    img = Image.open(io.BytesIO(render_week_card(label).to_image_bytes(fmt="PNG"))).convert("L")
+    return img.point(lambda v: 255 if v > 40 else 0).getbbox()
 
 
 def test_the_card_is_mostly_dark_so_it_reads_as_a_title_not_a_flash():
