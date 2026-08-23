@@ -562,6 +562,50 @@ def tv_slideshow(ctx: click.Context, path: str, pause: float, token: str, ha_url
 
 _SCOREBOARD_PLAYLIST = "fpp-scoreboard"
 
+# The intro video is shipped ONCE, by hand, from the led-animations repo via
+# lib/ship.upload(). This command never writes it. Re-uploading a file FPP's
+# decoder holds open produced 124,891 `Invalid NAL unit size` errors and a
+# 21 MB fppd.log on 2026-08-16, from a file whose checksum matched exactly.
+_INTRO_VIDEO = "nfl_intro_384.mp4"
+_WEEK_IMAGE = "fpp-scoreboard-week.jpg"
+_INTRO_PAUSE = 2.5
+
+
+def _intro_entries(fpp, league, week_label, enabled, last_played, now, every_secs):
+    """The playlist leadIn, and when the intro last played.
+
+    Returns ([], last_played) to suppress it. Four reasons to suppress:
+    disabled, not NFL, the video is not on the device, or it played too
+    recently.
+
+    The throttle exists because leadIn plays once per playlist START, and the
+    scoreboard loop restarts the playlist on every refresh. When games are live
+    the loop deliberately skips its refresh floor and refetches as fast as the
+    cards cycle — so without this the intro would fire every couple of minutes
+    on a Sunday afternoon, which is exactly what putting it in leadIn was
+    meant to avoid.
+    """
+    if not enabled or league != "nfl":
+        return [], last_played
+    if last_played is not None and now - last_played < every_secs:
+        return [], last_played
+    if _INTRO_VIDEO not in fpp.list_media():
+        return [], last_played
+
+    from .displays import nfl as _nfl
+
+    fpp.upload_file("images", _WEEK_IMAGE,
+                    _nfl.render_week_card(week_label).to_image_bytes())
+    return [
+        {"type": "media", "enabled": 1, "playOnce": 0,
+         "mediaName": _INTRO_VIDEO, "displayMode": "argsOnly"},
+        {"type": "image", "enabled": 1, "playOnce": 0,
+         "imagePath": _WEEK_IMAGE, "modelName": "LED Panels",
+         "displayMode": "argsOnly"},
+        {"type": "pause", "enabled": 1, "playOnce": 0,
+         "duration": _INTRO_PAUSE, "displayMode": "argsOnly"},
+    ], now
+
 
 @main.command("scoreboard")
 @click.option(
@@ -616,10 +660,27 @@ _SCOREBOARD_PLAYLIST = "fpp-scoreboard"
     show_default=True,
     help="Close each lap with standings (soccer) or stat leaders (NFL).",
 )
+@click.option(
+    "--intro/--no-intro",
+    default=True,
+    show_default=True,
+    help="Play the NFL shield intro before the cards. NFL only; needs "
+         "nfl_intro_384.mp4 already on the device.",
+)
+@click.option(
+    "--intro-every",
+    default=30.0,
+    show_default=True,
+    type=float,
+    metavar="MINUTES",
+    help="Minimum minutes between intro plays. Live games refetch every few "
+         "minutes and would otherwise replay it every time.",
+)
 @click.pass_context
 def scoreboard(ctx: click.Context, league: str, interval: float,
                max_cards: int, cycle: float, min_interval: float,
-               refresh: float, table: bool) -> None:
+               refresh: float, table: bool, intro: bool,
+               intro_every: float) -> None:
     """Display a live soccer scoreboard on the LED panel.
 
     Each card is one game: club colours and shields, the score if it is live or
@@ -689,7 +750,8 @@ def scoreboard(ctx: click.Context, league: str, interval: float,
             games = games + table_cards(league)
         return games, reason
 
-    def _build_and_play(fpp: FPPClient, games: list[dict], dwell: float) -> None:
+    def _build_and_play(fpp: FPPClient, games: list[dict], dwell: float,
+                        lead_in: list[dict]) -> None:
         """Upload rendered frames and (re)start the scoreboard playlist."""
         entries = []
 
@@ -738,7 +800,7 @@ def scoreboard(ctx: click.Context, league: str, interval: float,
             "desc": "",
             "random": 0,
             "empty": False,
-            "leadIn": [],
+            "leadIn": lead_in,
             "mainPlaylist": entries,
             "leadOut": [],
         }
@@ -762,16 +824,23 @@ def scoreboard(ctx: click.Context, league: str, interval: float,
             return interval
         return max(min_interval, min(interval, cycle / n))
 
+    intro_last: float | None = None
     click.echo(f"Fetching scores ({league.upper()})...")
     try:
         while True:
             games, reason = _fetch()
             n = len(games)
             dwell = _dwell(n)
-            click.echo(f"Building scoreboard — {n} card{'s' if n != 1 else ''} "
-                       f"[{_REASONS.get(reason, reason)}]  ({dwell:.0f}s each)")
+            week_label = games[0]["league_label"] if games else "NFL"
             with _client(host) as fpp:
-                _build_and_play(fpp, games, dwell)
+                lead_in, intro_last = _intro_entries(
+                    fpp, league, week_label, intro, intro_last,
+                    time.time(), intro_every * 60.0)
+                if lead_in:
+                    click.echo(f"  intro + {week_label} card")
+                click.echo(f"Building scoreboard — {n} card{'s' if n != 1 else ''} "
+                           f"[{_REASONS.get(reason, reason)}]  ({dwell:.0f}s each)")
+                _build_and_play(fpp, games, dwell, lead_in)
 
             cycle_secs = max(n, 1) * dwell
             # Nothing is live: results and fixtures do not change minute to
