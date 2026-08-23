@@ -12,3 +12,6 @@ dist/
 
 # Generated/uploaded media assets, not used by the code
 images/
+
+# SDD scratch
+.superpowers/
