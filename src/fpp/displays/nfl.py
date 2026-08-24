@@ -21,7 +21,7 @@ from functools import lru_cache
 
 import httpx
 
-from ..canvas import Color, Frame
+from ..canvas import WIDTH, Color, Frame
 from .soccer import _hex, _kickoff, next_fixture
 from .soccer import render_scoreboard as _render_card
 
@@ -407,4 +407,32 @@ def render_no_games() -> Frame:
     frame = Frame(bg=(8, 8, 8))
     frame.text(96, 82, LEAGUE_LABEL, size=26, color=(70, 70, 70), anchor="mm")
     frame.text(96, 112, "No games", size=16, color=(50, 50, 50), anchor="mm")
+    return frame
+
+
+# Sizes tried largest-first until the label fits. "SUPER BOWL" and
+# "CONF CHAMP" are ten characters and will not take the largest size;
+# "WEEK 3" will. Fitting rather than fixing the size means the card never
+# clips and never looks arbitrarily small.
+WEEK_CARD_SIZES = (34, 30, 26, 22, 18)
+
+
+def render_week_card(label: str) -> Frame:
+    """The title card that follows the intro video in the playlist leadIn.
+
+    Deliberately dark. It lands about half a second after a full-frame
+    whiteout, and a bright card would read as the blowout continuing rather
+    than as a title arriving.
+    """
+    frame = Frame(bg=(6, 8, 12))
+
+    size = WEEK_CARD_SIZES[-1]
+    for candidate in WEEK_CARD_SIZES:
+        if frame.text_width(label, candidate) <= WIDTH - 8:
+            size = candidate
+            break
+
+    frame.text(96, 88, label, size=size, color=(235, 238, 245), anchor="mm")
+    frame.line(56, 112, 136, 112, color=(190, 30, 40), width=2)
+    frame.text(96, 128, LEAGUE_LABEL, size=11, color=(120, 126, 138), anchor="mm")
     return frame
