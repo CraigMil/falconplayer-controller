@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 
 import httpx
-from PIL import Image, ImageDraw
+from PIL import Image
 
 from ..canvas import Color, Frame, contrast, dim
 
@@ -428,31 +428,22 @@ STATUS_Y, STATUS_H = 126, 22
 NEXT_Y = 148             # two rows of 22px, 148..191
 
 LOGO_SIZE = 58
-LOGO_OPACITY = 0.55
-DISC_OPACITY = 0.38
+# 0.75, raised from 0.55 when the disc behind the logo was removed. The disc
+# used to supply the contrast that made a logo readable against its own club
+# colour; without it, 0.55 left several teams washed out.
+LOGO_OPACITY = 0.75
 
 
-def _disc_color(alt_color: Color, bg_color: Color) -> Color:
-    """Return alt_color, brightened if it's too similar to the background."""
-    bg_lum = 0.299 * bg_color[0] + 0.587 * bg_color[1] + 0.114 * bg_color[2]
-    alt_lum = 0.299 * alt_color[0] + 0.587 * alt_color[1] + 0.114 * alt_color[2]
-    if abs(alt_lum - bg_lum) < 55:
-        # Too close — blend alt_color toward its opposite brightness
-        target = 230 if bg_lum < 128 else 25
-        blend = 0.55
-        return tuple(int(c * (1 - blend) + target * blend) for c in alt_color)  # type: ignore
-    return alt_color
+def _place_logo(frame: Frame, url: str, cx: int, cy: int) -> None:
+    """Composite a logo centered at (cx, cy).
 
-
-def _place_logo(frame: Frame, url: str, cx: int, cy: int, alt_color: Color, bg_color: Color) -> None:
-    """Composite a logo centered at (cx, cy) with a contrasting disc behind it."""
-    disc_r = LOGO_SIZE // 2 + 6
-    disc_size = disc_r * 2
-    fill = _disc_color(alt_color, bg_color) + (int(255 * DISC_OPACITY),)
-    disc_img = Image.new("RGBA", (disc_size, disc_size), (0, 0, 0, 0))
-    ImageDraw.Draw(disc_img).ellipse([0, 0, disc_size - 1, disc_size - 1], fill=fill)
-    frame.paste(disc_img, cx - disc_r, cy - disc_r, opacity=1.0)
-
+    There used to be a translucent disc behind the logo for contrast. It was
+    removed because it collided with the team name: its radius was
+    LOGO_SIZE // 2 + 6 = 35 about a centre at y=64, so its top edge landed on
+    y=29 — exactly the row the full club name is drawn on. The overlap was
+    geometric, not occasional. Raising LOGO_OPACITY covers the contrast the
+    disc was providing.
+    """
     if not url:
         return
     logo = _fetch_logo(url)
@@ -514,10 +505,8 @@ def render_scoreboard(game: dict) -> Frame:
     frame.text_fit(48,  29, game["away_name"], max_width=90, size=10, color=away_fg)
     frame.text_fit(144, 29, game["home_name"], max_width=90, size=10, color=home_fg)
 
-    _place_logo(frame, game["away_logo"], cx=48,  cy=64,
-                alt_color=game["away_alt_color"], bg_color=away_bg)
-    _place_logo(frame, game["home_logo"], cx=144, cy=64,
-                alt_color=game["home_alt_color"], bg_color=home_bg)
+    _place_logo(frame, game["away_logo"], cx=48,  cy=64)
+    _place_logo(frame, game["home_logo"], cx=144, cy=64)
 
     state = game["state"]
     if state == "pre":
