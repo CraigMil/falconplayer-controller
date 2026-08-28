@@ -18,7 +18,7 @@ from functools import lru_cache
 import httpx
 from PIL import Image
 
-from ..canvas import Color, Frame, contrast, dim
+from ..canvas import Color, Frame, dim
 
 ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer"
 
@@ -427,29 +427,100 @@ TEAM_H = 126             # club-colour halves, 0..125
 STATUS_Y, STATUS_H = 126, 22
 NEXT_Y = 148             # two rows of 22px, 148..191
 
-LOGO_SIZE = 58
-# 0.75, raised from 0.55 when the disc behind the logo was removed. The disc
-# used to supply the contrast that made a logo readable against its own club
-# colour; without it, 0.55 left several teams washed out.
-LOGO_OPACITY = 0.75
+# The crest is sized by the CORRIDOR between the club name above it and the
+# score below, because Premier League crests are tall and narrow — Spurs is
+# 224x458 in its own file, so a square box binds on height and leaves two
+# thirds of the 96px half-width unused. Measured ink: the name bottoms out at
+# y=35 and the score tops at y=98, so 62 centred on 66 is the largest box that
+# clears both. NFL marks are the opposite shape (462x206) and simply get wider.
+LOGO_SIZE = 62
+LOGO_CY = 66
+
+# Was 106. The score moved down to the floor of the team area to give the
+# crest that corridor: at size 36 its ink runs y=98..124, and the status bar
+# starts at 126. Anything lower clips.
+SCORE_Y = 111
+# Full strength. It went 0.55 -> 0.75 when the disc behind the logo was
+# removed, because the disc had been supplying the contrast that made a mark
+# readable against its own club colour. The club colour is now gone too, and
+# on black there is nothing left for a knocked-back logo to separate from —
+# any opacity below 1.0 is just dimmer ink on the same ground.
+LOGO_OPACITY = 1.0
+
+# Cap on the per-logo brightness lift. 2.2 pulls a mark whose brightest ink
+# sits around 116 up to full; past that the lift starts flattening a dark
+# crest's internal shading into one block of colour, which reads as a
+# silhouette rather than a badge.
+LOGO_GAIN_MAX = 2.2
+
+
+# Alpha below this is treated as empty when finding the mark's extent. A hard
+# "any non-zero pixel" test is too eager: several crests carry a faint halo of
+# 1-3 alpha from their original export, which reaches most of the way to the
+# canvas edge and would defeat the crop entirely.
+LOGO_INK_ALPHA = 16
+
+
+def _crop_to_ink(logo: Image.Image) -> Image.Image:
+    """Trim the transparent margin baked into the source PNG.
+
+    thumbnail() fits the CANVAS, not the mark, so a crest exported with a
+    margin renders smaller than one exported tight — Premier League crests
+    carry about 8% and the row of them looked ragged as a result. Cropping
+    first means the box is filled by ink in every case, which both enlarges
+    the marks and makes them agree with each other.
+    """
+    bbox = logo.split()[3].point(lambda v: 255 if v > LOGO_INK_ALPHA else 0).getbbox()
+    return logo.crop(bbox) if bbox else logo
+
+
+def _brighten(logo: Image.Image) -> Image.Image:
+    """Scale a logo's colour channels so its brightest ink reaches full.
+
+    Team marks arrive at wildly different exposures — a navy-on-navy crest
+    peaks near 90 where a white-on-red one is already at 255. Behind the
+    club-colour half that spread was masked; on black the dark ones simply
+    sink into the card.
+
+    The peak is measured over OPAQUE pixels only. ESPN's PNGs carry arbitrary
+    RGB under a zero alpha, and a single stray white transparent pixel would
+    set the peak to 255 and silently disable the lift for that team.
+    """
+    black = Image.new("RGB", logo.size, (0, 0, 0))
+    black.paste(logo, (0, 0), mask=logo.split()[3])
+    peak = max(hi for _, hi in black.getextrema())
+    if peak == 0:
+        return logo
+
+    gain = min(LOGO_GAIN_MAX, 255.0 / peak)
+    if gain <= 1.01:
+        return logo
+
+    lut = [min(255, int(v * gain + 0.5)) for v in range(256)]
+    r, g, b, a = logo.split()
+    return Image.merge("RGBA", (r.point(lut), g.point(lut), b.point(lut), a))
 
 
 def _place_logo(frame: Frame, url: str, cx: int, cy: int) -> None:
-    """Composite a logo centered at (cx, cy).
+    """Composite a logo centered at (cx, cy), lifted to full brightness.
 
     There used to be a translucent disc behind the logo for contrast. It was
     removed because it collided with the team name: its radius was
     LOGO_SIZE // 2 + 6 = 35 about a centre at y=64, so its top edge landed on
     y=29 — exactly the row the full club name is drawn on. The overlap was
-    geometric, not occasional. Raising LOGO_OPACITY covers the contrast the
-    disc was providing.
+    geometric, not occasional.
+
+    Crop and brighten BEFORE the thumbnail: LANCZOS mixes ink with the
+    transparent surround, so resizing first would fold those
+    RGB-under-zero-alpha pixels into the edge and shift the peak the gain is
+    measured from, as well as leaving the source margin in the box.
     """
     if not url:
         return
     logo = _fetch_logo(url)
     if logo is None:
         return
-    logo = logo.copy()
+    logo = _brighten(_crop_to_ink(logo.copy()))
     logo.thumbnail((LOGO_SIZE, LOGO_SIZE), Image.LANCZOS)
     lw, lh = logo.size
     frame.paste(logo, cx - lw // 2, cy - lh // 2, opacity=LOGO_OPACITY)
@@ -486,18 +557,23 @@ def _next_row(frame: Frame, y: int, abbr: str, colour: Color, nxt: dict | None) 
     frame.text(188, y + 11, nxt["when"], size=10, color=(150, 150, 150), anchor="rm")
 
 
+# Every team's side of the card is now the same ground, so the text colour no
+# longer depends on which club is on it. contrast() on black would return this
+# for both halves; naming it once says the halves are gone on purpose.
+CARD_FG = (255, 255, 255)
+
+
 def render_scoreboard(game: dict) -> Frame:
-    away_bg = dim(game["away_color"])
-    home_bg = dim(game["home_color"])
-    away_fg = contrast(*away_bg)
-    home_fg = contrast(*home_bg)
+    away_fg = home_fg = CARD_FG
 
     frame = Frame()
 
-    # Club-colour halves
-    frame.rect(0,  0, 96, TEAM_H, away_bg)
-    frame.rect(96, 0, 96, TEAM_H, home_bg)
-    frame.line(95, 0, 95, TEAM_H - 1, color=(10, 10, 10), width=2)
+    # The club-colour halves are gone — the card is black behind both teams,
+    # and the identity is carried by the logo and the abbreviation instead.
+    # The seam still needs marking, but a 2px line that used to read as a
+    # join between two colours has to be lighter than the ground now that it
+    # is the only thing there.
+    frame.line(95, 0, 95, TEAM_H - 1, color=(30, 30, 30), width=2)
 
     # Names above the shield
     frame.text(48,  15, game["away_abbr"], size=21, color=away_fg, anchor="mm")
@@ -505,22 +581,23 @@ def render_scoreboard(game: dict) -> Frame:
     frame.text_fit(48,  29, game["away_name"], max_width=90, size=10, color=away_fg)
     frame.text_fit(144, 29, game["home_name"], max_width=90, size=10, color=home_fg)
 
-    _place_logo(frame, game["away_logo"], cx=48,  cy=64)
-    _place_logo(frame, game["home_logo"], cx=144, cy=64)
+    _place_logo(frame, game["away_logo"], cx=48,  cy=LOGO_CY)
+    _place_logo(frame, game["home_logo"], cx=144, cy=LOGO_CY)
 
     state = game["state"]
     if state == "pre":
-        # On its own the "vs" straddles the seam between two club colours and
-        # disappears into whichever is lighter. Give it its own ground.
-        frame.rect(78, 92, 36, 28, (12, 12, 12))
-        frame.text(96, 106, "vs", size=22, color=(205, 205, 205), anchor="mm")
+        # The "vs" used to need its own dark patch, because it straddled the
+        # seam between two club colours and vanished into whichever was
+        # lighter. Both sides are black now, so the patch would be a black
+        # rectangle on black.
+        frame.text(96, SCORE_Y, "vs", size=22, color=(205, 205, 205), anchor="mm")
     else:
-        frame.text(48,  106, game["away_score"], size=36, color=away_fg, anchor="mm")
-        frame.text(144, 106, game["home_score"], size=36, color=home_fg, anchor="mm")
-        frame.text(96,  106, "–", size=17, color=(120, 120, 120), anchor="mm")
+        frame.text(48,  SCORE_Y, game["away_score"], size=36, color=away_fg, anchor="mm")
+        frame.text(144, SCORE_Y, game["home_score"], size=36, color=home_fg, anchor="mm")
+        frame.text(96,  SCORE_Y, "–", size=17, color=(120, 120, 120), anchor="mm")
 
-    # Status bar
-    frame.rect(0, STATUS_Y, 192, STATUS_H, (14, 14, 14))
+    # Status bar. Its ground is black like everything else, so the rule along
+    # the top is now the whole of what separates it from the match above.
     frame.line(0, STATUS_Y, 191, STATUS_Y, color=(38, 38, 38), width=1)
 
     if state == "pre":
@@ -545,8 +622,7 @@ def render_scoreboard(game: dict) -> Frame:
     frame.text_fit(140, STATUS_Y + 11, league_line, max_width=100, size=10,
                    color=(140, 140, 140))
 
-    # Next-game strip
-    frame.rect(0, NEXT_Y, 192, 192 - NEXT_Y, (9, 9, 9))
+    # Next-game strip — same story as the status bar: rule only, no ground.
     frame.line(0, NEXT_Y, 191, NEXT_Y, color=(38, 38, 38), width=1)
 
     if game.get("aggregate"):
@@ -601,8 +677,11 @@ def render_table(card: dict) -> Frame:
     down is the thing you want to read at a glance from across a room. European
     qualification is a colour bar down the left edge plus a faint wash, which
     reads as "marked" without competing with it.
+
+    The band colours below stay — they encode which zone a club is in, and
+    are the point of the card. Only the card's own ground goes black.
     """
-    frame = Frame(bg=(8, 8, 8))
+    frame = Frame()
 
     frame.text(4, 8, card["league_label"].upper(), size=9,
                color=(120, 120, 120), anchor="lm")
@@ -659,7 +738,7 @@ _KEY_LABEL = {"ucl": "UCL", "uel": "EUROPA", "rel": "RELEGATION"}
 
 def render_no_games(league_key: str) -> Frame:
     _, label = LEAGUES.get(league_key, ("", league_key.upper()))
-    frame = Frame(bg=(8, 8, 8))
+    frame = Frame()
     frame.text(96, 82,  label,      size=22, color=(70, 70, 70), anchor="mm")
     frame.text(96, 112, "No games", size=16, color=(50, 50, 50), anchor="mm")
     return frame

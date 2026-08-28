@@ -366,7 +366,7 @@ LDR_MEDALS: tuple[Color, ...] = ((255, 205, 80), (200, 205, 215), (205, 140, 85)
 
 def render_leaders(card: dict) -> Frame:
     """One leaderboard: eight players, ranked, with the statistic on the right."""
-    frame = Frame(bg=(8, 8, 8))
+    frame = Frame()
 
     frame.text(4, 9, card["title"], size=12, color=(240, 240, 240), anchor="lm")
     frame.text(188, 9, card["league_label"], size=9, color=(120, 120, 120), anchor="rm")
@@ -377,6 +377,9 @@ def render_leaders(card: dict) -> Frame:
     for i, row in enumerate(card["rows"]):
         y = LDR_HEAD_H + i * LDR_ROW_H
         if i % 2 == 0:
+            # The card ground is black, so the zebra banding is the only thing
+            # keeping eight 19px rows from reading as one block of text. It
+            # stays — it is structure, not a background tint.
             frame.rect(0, y, 192, LDR_ROW_H, (17, 17, 17))
         medal = LDR_MEDALS[i] if i < len(LDR_MEDALS) else None
         if medal:
@@ -404,7 +407,7 @@ def _fmt(value: float | None) -> str:
 
 
 def render_no_games() -> Frame:
-    frame = Frame(bg=(8, 8, 8))
+    frame = Frame()
     frame.text(96, 82, LEAGUE_LABEL, size=26, color=(70, 70, 70), anchor="mm")
     frame.text(96, 112, "No games", size=16, color=(50, 50, 50), anchor="mm")
     return frame
@@ -423,8 +426,12 @@ def render_week_card(label: str) -> Frame:
     Deliberately dark. It lands about half a second after a full-frame
     whiteout, and a bright card would read as the blowout continuing rather
     than as a title arriving.
+
+    The ground used to be (6, 8, 12) — a barely-blue black. It is now flat
+    black like every other card; at 192px that tint was never visible as a
+    colour, only as the card failing to match its neighbours.
     """
-    frame = Frame(bg=(6, 8, 12))
+    frame = Frame()
 
     size = WEEK_CARD_SIZES[-1]
     for candidate in WEEK_CARD_SIZES:
