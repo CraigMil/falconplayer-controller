@@ -41,7 +41,12 @@ today+tomorrow date range:
 | Soccer | `soccer/eng.1`, `soccer/uefa.champions`, `soccer/uefa.europa`, `soccer/eng.fa`, `soccer/conmebol.libertadores`, `soccer/conmebol.sudamericana`, `soccer/concacaf.champions` |
 | Tennis | `tennis/atp`, `tennis/wta` — `major: true` tournaments only |
 | Motorsport | `racing/f1` |
+| Home teams | `baseball/mlb`, `hockey/nhl`, `soccer/usa.1`, `soccer/usa.nwsl`, `basketball/wnba`, `basketball/mens-college-basketball` |
 | Oddity | `data/oddities.yaml` (curated windows) |
+
+The home-team slugs are fetched only to find the user's own teams; every other
+game in them is discarded. A Mariners-only MLB fetch is one request yielding at
+most two cards. NFL and college football are already fetched for their own tier.
 
 All slugs verified live on 2026-08-29. Out-of-season slugs return `events: []`,
 which is correct behaviour and not an error — `eng.fa` and
@@ -77,6 +82,14 @@ already be two days on in UTC — see testing.
 Read `competitions[].geoBroadcasts[].media.shortName`. Normalise known variants
 (`USA Net` -> `USA`, `NBC Sports` -> `NBC`). Then classify into three tiers:
 
+Two normalisation rules the home-team leagues force, both load-bearing:
+
+- **Regional suffixes strip to the parent service.** `Prime Video-Seattle` is
+  Prime Video, which the user has.
+- **Bare local call signs are watchable.** `KOMO-TV`, `KING`, `KIRO` are local
+  over-the-air. Without this rule the Storm game lands in the payable tier
+  despite being free on an antenna.
+
 **Watchable** — the user has it. Shows normally.
 Broadcast and cable (NBC, CBS, ABC, FOX, ESPN, ESPN2, ESPNU, FS1, FS2, USA,
 TNT, TBS, truTV, CNBC, Golf Channel, BTN, SEC Network, ACCN), plus Peacock,
@@ -97,11 +110,46 @@ The payable tier leaks without a hard definition. An event is major if any of:
 
 - it is a **final, semifinal, or quarterfinal** of a tracked competition;
 - it is a **tennis tournament with `major: true`** (the Slams);
-- it is an **F1 Race** session (not Sprint, Qual or practice);
+- it is an **F1 Race or Sprint** session (Qual and practice do not qualify);
 - it carries `major: true` (or falls after `major_from:`) in `oddities.yaml`.
 
 A group-stage Sudamericana tie or a Tuesday darts preliminary is not major, and
 so is dropped when it is on a service the user does not have.
+
+## Home teams
+
+Seattle teams are always shown when they play, regardless of sport, channel, or
+caps. This is a deliberate exception to the channel filter, not an oversight.
+
+Configured in `src/fpp/data/home_teams.yaml` so the list is editable without
+code:
+
+    - { slug: football/nfl,              team: Seattle Seahawks }
+    - { slug: baseball/mlb,              team: Seattle Mariners }
+    - { slug: hockey/nhl,                team: Seattle Kraken }
+    - { slug: soccer/usa.1,              team: Seattle Sounders FC }
+    - { slug: soccer/usa.nwsl,           team: Seattle Reign FC }
+    - { slug: basketball/wnba,           team: Seattle Storm }
+    - { slug: football/college-football, team: Washington Huskies }
+    - { slug: basketball/mens-college-basketball, team: Washington Huskies }
+
+**They bypass the channel filter entirely**, and are marked `$` when the
+broadcast is payable. Where an event lists several broadcasts, the card shows
+the best one available to the user: whitelisted first, then payable, and never
+a foreign-only feed. On 2026-08-29 this produces `$ Mariners.TV` and `$ NWSL+`
+alongside the Sounders on Apple TV and the Storm on KOMO — a board that tells
+the user their teams are playing and what each would cost.
+
+**Home games occupy their own block, placed first**, ahead of today:
+
+    [SEATTLE][home games][TODAY][...][TOMORROW][...][AVAILABLE TO WATCH][...]
+
+A separate block rather than pinned rows inside the day blocks, for two
+reasons: it guarantees the visibility the rule promises, and it stops home games
+consuming a per-sport cap — a Seahawks game should not cost an NFL slot.
+
+Home events are **deduplicated out of the day blocks**, so a Huskies game never
+appears twice. Cap of 4, ordered today before tomorrow, then by start time.
 
 ## Caps and ranking
 
@@ -200,13 +248,16 @@ the window.
 
 Dwell reuses the scoreboard's shrink-to-fit rule:
 `min(--interval, --cycle / n)` floored at `--min-interval`, defaulting
-12s / 180s / 6s.
+12s / 210s / 6s.
 
 **Highlight cards are exempt** and hold a 15-second floor — see the dwell
-exception under Highlights. A worst-case lap is therefore 16 event cards at the
-6s floor, 3 dividers, and 3 highlight cards at 15s: about 160 seconds. The
-three-minute target holds, but only because the event floor absorbs the QR
-cards' cost. If the caps ever rise, this is the number that breaks first.
+exception under Highlights.
+
+Worst case is now 4 home cards, 16 event cards, 3 highlight cards and 4
+dividers. At the 6s floor with the QR exemption that is roughly 181 seconds,
+which is why `--cycle` is 210 rather than 180: 6s is already the legibility
+limit, so the lap budget had to grow rather than the floor shrink. If the caps
+ever rise again, this is the number that breaks first.
 
 Refresh is adaptive: **every 60s while anything is live**, every 10 minutes
 when nothing is. Live data goes stale fast; idle data does not. The calls are
@@ -342,7 +393,7 @@ Two limitations, stated rather than papered over:
 Five files in `device/`:
 
 1. **`fpp-whatson.service`** (new), modelled on `fpp-scoreboard.service`:
-   `ExecStart=/home/fpp/fpp-worldclock-venv/bin/fpp --host 127.0.0.1 whatson --interval 12 --cycle 180`,
+   `ExecStart=/home/fpp/fpp-worldclock-venv/bin/fpp --host 127.0.0.1 whatson --interval 12 --cycle 210`,
    `Restart=on-failure`, `After=network-online.target fpp.service`.
    **Not enabled at boot** — the user never reboots the FPP, and leaving all
    three display services disabled at boot keeps the existing README claim true.
@@ -386,6 +437,14 @@ response):
 - live-tier and drama ordering;
 - the tennis deciding-set promotion, including the two-at-once case;
 - F1 session selection and practice exclusion;
+- home-team matching across all eight configured entries, including that a home
+  game on a non-whitelisted service still appears and is marked payable, that it
+  is deduplicated out of the day blocks, and that it does not consume a
+  per-sport cap;
+- regional and local channel normalisation (`Prime Video-Seattle` -> Prime
+  Video; `KOMO-TV` watchable);
+- broadcast preference order, that a Mariners game with `Sportsnet` and `TVA`
+  present shows `Mariners.TV` and never the Canadian feed;
 - **the PDT day-boundary split**, including an event that is "tomorrow" in PDT
   but already the day after in UTC. This is the bug this design is most likely
   to have.
@@ -415,6 +474,7 @@ real day can be eyeballed before anything touches the panel.
     src/fpp/highlights.py
     src/fpp/data/oddities.yaml
     src/fpp/data/highlight_sources.yaml
+    src/fpp/data/home_teams.yaml
     device/fpp-whatson.service
     device/sudoers-fpp-whatson
     tests/test_whatson.py
