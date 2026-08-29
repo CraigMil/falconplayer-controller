@@ -8,6 +8,10 @@ Status: approved design, not yet implemented
 A display service for the 192x192 LED panel that answers one question: *what
 sport worth watching is on today and tomorrow, and what channel is it on?*
 
+It also surfaces **highlights that have just been posted** — a condensed F1
+race, a tennis match recap — as scannable QR cards, so a good event you missed
+is still something you can go watch.
+
 It is a **schedule board**, not a scoreboard. `fpp scoreboard` and `fpp nfl`
 already show live scores for chosen leagues. This service surveys everything,
 ranks it, and tells you where to watch — filtered so that nothing appears that
@@ -18,7 +22,8 @@ Invoked on demand like the other display services. Not enabled at boot.
 ## Scope
 
 In scope: a new `fpp whatson` command and `fpp-whatson.service`, the
-`oddities.yaml` seed file, device registration, and Home Assistant wiring.
+`oddities.yaml` and `highlight_sources.yaml` seed files, YouTube highlight
+discovery with QR cards, device registration, and Home Assistant wiring.
 
 Out of scope: any weekly auto-refresh cron for the oddities file; any change to
 `scoreboard`, `nfl`, or `worldclock` behaviour beyond registering the new
@@ -195,7 +200,13 @@ the window.
 
 Dwell reuses the scoreboard's shrink-to-fit rule:
 `min(--interval, --cycle / n)` floored at `--min-interval`, defaulting
-12s / 180s / 6s, keeping a lap under three minutes.
+12s / 180s / 6s.
+
+**Highlight cards are exempt** and hold a 15-second floor — see the dwell
+exception under Highlights. A worst-case lap is therefore 16 event cards at the
+6s floor, 3 dividers, and 3 highlight cards at 15s: about 160 seconds. The
+three-minute target holds, but only because the event floor absorbs the QR
+cards' cost. If the caps ever rise, this is the number that breaks first.
 
 Refresh is adaptive: **every 60s while anything is live**, every 10 minutes
 when nothing is. Live data goes stale fast; idle data does not. The calls are
@@ -231,6 +242,100 @@ rally appears rarely.
 
 Dates beyond a year out are approximate by nature. The file carries a comment
 saying so. Stale entries fail safe by simply not matching today or tomorrow.
+
+## Highlights — "things you could go watch"
+
+A separate module, `src/fpp/highlights.py`, feeding a third block of slides.
+Kept out of `whatson.py` because it is a distinct source with a distinct
+failure mode.
+
+### Source
+
+YouTube per-channel RSS: `https://www.youtube.com/feeds/videos.xml?channel_id=<id>`.
+No API key and no quota, parsed with stdlib `xml.etree`.
+
+ESPN was evaluated first and rejected: the `highlights` array on a competition
+is empty, and the event `links` point at Gamecast and Preview pages rather than
+video.
+
+Two properties of the feed shape the design:
+
+- **It is a rolling window of about 15 videos.** On a busy channel that is
+  three or four days. This is a recency feature, not an archive.
+- **Title matching is mandatory.** The F1 channel posts constant filler
+  ("Grid Games", driver interviews). The wanted video appears only after a
+  session, so sources match on title patterns, never on "newest video".
+
+### Configuration
+
+`src/fpp/data/highlight_sources.yaml`, one entry per source:
+
+    - name: Formula 1
+      sport: f1
+      channel_id: UCB_qr75-ydFVKSF9Dmo6izg
+      patterns: ["Race Highlights", "Qualifying Highlights", "Sprint Highlights"]
+
+Seeded sources: F1 official; tennis (ATP, WTA, US Open, Wimbledon); NFL and
+ESPN College Football; soccer (NBC Sports for the EPL, CBS Sports Golazo for
+the UCL).
+
+### Selection
+
+Keep a video when it was published within the last **48 hours** and its title
+matches one of its source's patterns, case-insensitively. Deduplicate by video
+id. Then cap at **3 cards**, at most one per source, ranked by recency. The
+per-source cap stops a single F1 weekend (race, qualifying and sprint) from
+consuming the whole block.
+
+### Placement and card
+
+A third block, after tomorrow, behind its own `AVAILABLE TO WATCH` divider:
+
+    [TODAY][...][TOMORROW][...][AVAILABLE TO WATCH][highlight cards]
+
+Card layout:
+
+    HIGHLIGHTS      2h     22px strip; shows age, not clock time
+    -----------------
+    ITALIAN GP             text_fit, size 14
+    Race Highlights        size 12 dimmed
+    [ QR code ]            132px, dark-on-white, centred
+
+### QR encoding
+
+`youtu.be/<VIDEOID>` is 28 bytes, which fits **QR v2 (25x25 modules) at ECC-L**,
+capacity 32 bytes. At 4px per module that is 100px plus a 32px quiet zone =
+132px, leaving roughly 60px for the title strip. Library: `segno` — pure
+Python, no dependencies, unlike `qrcode`.
+
+**The risk here is physical, not geometric.** Phone cameras often struggle to
+scan a bright emissive LED matrix. Mitigations: render dark-on-white rather
+than the panel's usual light-on-dark, keep the full quiet zone, and use 4px
+modules rather than 3. **This must be physically tested on the panel before the
+rest of the highlights work is built** — if a QR cannot be scanned off this
+display, the whole feature needs a different handoff.
+
+### Dwell exception
+
+Highlight cards get a **dwell floor of 15 seconds**, exempt from the
+shrink-to-fit rule that governs every other card. Other cards are glanced at; a
+QR card must be noticed and then scanned with a phone. A 6-second QR card is one
+nobody ever scans.
+
+### Refresh and failure
+
+Highlights refresh every 10 minutes, independent of the 60-second live refresh —
+they do not appear that quickly.
+
+Two limitations, stated rather than papered over:
+
+1. **EPL highlights are frequently geo-restricted in the US**, and RSS gives no
+   way to detect this. A soccer card can therefore lead to a video that will not
+   play. Recorded as a comment in the config rather than silently dropping the
+   source.
+2. **A dead or renamed channel fails silently.** The feed 404s, that source is
+   skipped, the block shrinks. No error card — a broken highlight feed must not
+   cost the user the schedule board.
 
 ## Device integration
 
@@ -285,8 +390,21 @@ response):
   but already the day after in UTC. This is the bug this design is most likely
   to have.
 
+Highlight tests, against a captured YouTube RSS fixture:
+
+- title-pattern matching, including the filler videos that must not match;
+- the 48-hour recency window, including a video exactly on the boundary;
+- the cap of 3 and the one-per-source rule, using an F1 weekend that posts
+  race, qualifying and sprint highlights together;
+- a 404 or malformed feed skips that source without failing the run;
+- QR payload encodes to v2 at ECC-L and round-trips to the right video id.
+
 Render smoke tests: every card type renders to a JPEG without exception,
-including a live tennis card, a payable card, and the empty state.
+including a live tennis card, a payable card, a highlight QR card, and the
+empty state.
+
+Physical test, before the rest of the highlights work: render one QR card to
+the panel and confirm a phone can actually scan it.
 
 Manual check: `fpp whatson --dry-run --out /tmp/cards` writes PNGs locally so a
 real day can be eyeballed before anything touches the panel.
@@ -294,7 +412,16 @@ real day can be eyeballed before anything touches the panel.
 ## New files
 
     src/fpp/displays/whatson.py
+    src/fpp/highlights.py
     src/fpp/data/oddities.yaml
+    src/fpp/data/highlight_sources.yaml
     device/fpp-whatson.service
     device/sudoers-fpp-whatson
     tests/test_whatson.py
+    tests/test_highlights.py
+
+## Dependencies
+
+One addition to `pyproject.toml`: `segno`, for QR rendering. Pure Python with
+no transitive dependencies. Everything else uses Pillow and the stdlib, both
+already present.
