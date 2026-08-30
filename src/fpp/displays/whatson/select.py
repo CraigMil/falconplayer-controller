@@ -12,7 +12,7 @@ from .config import home_teams, oddities
 from .window import PACIFIC
 
 CAPS = {
-    "nfl": 3, "ncaaf": 3, "epl": 3, "cup": 2, "tennis": 2, "f1": 2,
+    "nfl": 3, "ncaaf": 3, "epl": 3, "cup": 2, "tennis": 4, "f1": 2,
     "oddity": 2, "home": 4, "highlight": 3,
 }
 
@@ -22,7 +22,7 @@ CAPS = {
 # the TOMORROW block was empty on any day busy enough to fill a cap.
 # Smaller than CAPS on purpose: tomorrow is "what is coming", not a second board.
 TOMORROW_CAPS = {
-    "nfl": 2, "ncaaf": 2, "epl": 3, "cup": 1, "tennis": 1, "f1": 1,
+    "nfl": 2, "ncaaf": 2, "epl": 3, "cup": 1, "tennis": 2, "f1": 1,
     "oddity": 0,
 }
 

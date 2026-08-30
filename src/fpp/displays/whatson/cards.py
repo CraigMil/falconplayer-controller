@@ -83,6 +83,33 @@ def _match(frame: Frame, card: dict) -> None:
         frame.text(96, mid + 2, "@", size=13, color=DIM, anchor="mm")
 
 
+def _tennis(frame: Frame, card: dict) -> None:
+    """Two players stacked. Names like "R. Carballes Baena" never fit the
+    two-column team layout, so each gets its own full-width row."""
+    body_top, body_bot = STRIP_H, H - CHANNEL_H
+    rows = [body_top + 6, body_top + 56]
+    players = card.get("players") or []
+    for y, p in zip(rows, players):
+        flag = _logo(p.get("flag", ""))
+        x_text = 8
+        if flag is not None:
+            frame.paste(flag.resize((20, 14)), 6, y + 2)
+            x_text = 32
+        label = p.get("name", "")
+        if p.get("seed"):
+            label = f"({p['seed']}) {label}"
+        frame.text_fit(x_text + (W - x_text - 8) // 2, y + 9, label,
+                       max_width=W - x_text - 10, size=16, min_size=8,
+                       color=FG, anchor="mm")
+        sets = p.get("sets") or []
+        if sets:
+            frame.text(W // 2, y + 28, "  ".join(str(s) for s in sets),
+                       size=14, color=FG if p.get("winner") else DIM, anchor="mm")
+    label = " · ".join(x for x in (card.get("detail", ""), card.get("subtitle", "")) if x)
+    frame.text_fit(W // 2, body_bot - 8, label, max_width=W - 10, size=10,
+                   min_size=7, color=DIM, anchor="mm")
+
+
 def _single(frame: Frame, card: dict) -> None:
     body_top, body_bot = STRIP_H, H - CHANNEL_H
     mid = (body_top + body_bot) // 2
@@ -179,6 +206,8 @@ def render(card: dict) -> Frame:
     _strip(frame, card)
     if card.get("layout") == "match":
         _match(frame, card)
+    elif card.get("layout") == "tennis":
+        _tennis(frame, card)
     else:
         _single(frame, card)
     _channel(frame, card)

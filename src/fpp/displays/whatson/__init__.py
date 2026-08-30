@@ -58,10 +58,24 @@ def build_board(now=None, include_practice: bool = False,
     # and the card is deliberately combined ("Men's & Women's"), so take each
     # tournament once.
     seen_tournaments = set()
+    seen_matches = set()
     for key in _TOURNAMENT:
         for event in _events(key, dated=False):
-            # require_major=False so the minor tournaments come back too — they
-            # carry bucket="oddity" and feed the ALSO ON slot.
+            # During a Slam the individual matches ARE the story, so they
+            # replace the summary card. The ATP and WTA feeds both carry every
+            # US Open match, hence the dedupe.
+            matches = sources.tennis_matches(event, key, now)
+            if matches:
+                for m in matches:
+                    if m["title"] in seen_matches:
+                        continue
+                    seen_matches.add(m["title"])
+                    collected.append(m)
+                seen_tournaments.add((event.get("name") or "").upper())
+                continue
+            # No play in the window (or a minor event): fall back to the
+            # tournament card. require_major=False lets the minor tournaments
+            # through as ALSO ON filler.
             card = sources.from_tournament(event, key, now, require_major=False)
             if card and card["title"] not in seen_tournaments:
                 seen_tournaments.add(card["title"])

@@ -344,3 +344,76 @@ def from_multiday(event: dict, sport: str, now=None):
         "bucket": "oddity",
     })
     return card
+
+
+def _seed(competitor: dict):
+    """A player's seed, or None. ESPN carries it as curatedRank on seeded
+    players only — there is no `seed` field anywhere in the payload."""
+    cur = (competitor.get("curatedRank") or {}).get("current")
+    return cur if isinstance(cur, int) and 0 < cur <= 40 else None
+
+
+def _player(competitor: dict) -> dict:
+    ath = competitor.get("athlete") or {}
+    sets = [ls.get("value") for ls in competitor.get("linescores") or []]
+    return {
+        "name": (ath.get("shortName") or ath.get("displayName") or "").upper(),
+        "seed": _seed(competitor),
+        "flag": (ath.get("flag") or {}).get("href", ""),
+        "sets": [int(v) for v in sets if isinstance(v, (int, float))],
+        "winner": bool(competitor.get("winner")),
+    }
+
+
+def tennis_matches(event: dict, sport: str, now=None, limit: int = 4):
+    """Up to `limit` match cards from a major, best first.
+
+    Replaces the single tournament card during a Slam. Ordering: live matches
+    first (a deciding set outranks a routine one), then by the BEST SEED in the
+    match, then by start time — so a 4-vs-18 outranks two unseeded players.
+    """
+    if not event.get("major"):
+        return []
+    comps = [c for g in event.get("groupings", []) for c in g.get("competitions", [])]
+    out = []
+    for comp in comps:
+        start = _iso(comp.get("date", ""))
+        if not start:
+            continue
+        if bucket(start, now) is None:
+            continue
+        state = _state(comp)
+        if state == "post":
+            continue
+        channel = best_channel(_broadcasts(comp))
+        if channel is None:
+            continue
+        players = [_player(c) for c in comp.get("competitors", [])]
+        if len(players) != 2 or not all(p["name"] for p in players):
+            continue
+        card = _base(sport, start, bucket(start, now), comp, channel, state)
+        seeds = [p["seed"] for p in players if p["seed"]]
+        best_seed = min(seeds) if seeds else 99
+        rnd = str((comp.get("round") or {}).get("displayName", ""))
+        sets_played = max((len(p["sets"]) for p in players), default=0)
+        card.update({
+            "layout": "tennis",
+            "players": players,
+            "title": " v ".join(p["name"] for p in players),
+            "subtitle": rnd,
+            "detail": event.get("shortName") or event.get("name", ""),
+            "best_seed": best_seed,
+            "major": True,
+            "score": None,
+        })
+        if state == "in":
+            # A deciding set is the whole reason to look up.
+            deciding = sets_played >= 5 or (sets_played >= 3 and len(comps) and
+                                            all(len(p["sets"]) >= 3 for p in players))
+            card["drama"] = 3 if deciding else 2
+            card["status_text"] = f"LIVE {sets_played}{'th' if sets_played > 3 else 'rd'}"[:12]
+        out.append(card)
+
+    out.sort(key=lambda c: (0 if c["state"] == "live" else 1, -c["drama"],
+                            c["best_seed"], c["start"]))
+    return out[:limit]

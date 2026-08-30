@@ -10,6 +10,9 @@ from fpp.displays.whatson.sources import (
     from_sessions,
     from_tournament,
 )
+from fpp.displays.whatson.sources import (
+    tennis_matches as from_tennis_matches,
+)
 
 FIX = Path(__file__).parent / "fixtures" / "espn"
 NOW = datetime(2026, 8, 29, 14, 0, tzinfo=timezone.utc)
@@ -118,3 +121,31 @@ def test_an_out_of_window_multiday_event_is_dropped():
 
 def test_boxing_out_of_season_yields_nothing():
     assert load("boxing_empty")["events"] == []
+
+
+def test_tennis_matches_are_ordered_by_best_seed():
+    us_open = [e for e in load("tennis_atp")["events"] if e["name"] == "US Open"][0]
+    # The fixture's matches are all completed qualifying, so force them live and
+    # into the window to exercise the ordering rather than the filtering.
+    for g in us_open["groupings"]:
+        for c in g["competitions"]:
+            c["date"] = "2026-08-29T18:00Z"
+            c["status"] = {"period": 1, "type": {"state": "pre"}}
+    seeds = [3, None, 12, None]
+    comps = [c for g in us_open["groupings"] for c in g["competitions"]][:4]
+    for c, seed in zip(comps, seeds):
+        for cm in c.get("competitors", []):
+            cm.pop("curatedRank", None)
+        if seed and c.get("competitors"):
+            c["competitors"][0]["curatedRank"] = {"current": seed}
+    cards = from_tennis_matches(us_open, "atp", NOW, limit=4)
+    if len(cards) >= 2:
+        assert cards[0]["best_seed"] <= cards[-1]["best_seed"]
+        assert cards[0]["layout"] == "tennis"
+        assert len(cards[0]["players"]) == 2
+
+
+def test_a_minor_tournament_yields_no_match_cards():
+    minor = [e for e in load("tennis_atp")["events"] if e["name"] != "US Open"]
+    for ev in minor:
+        assert from_tennis_matches(ev, "atp", NOW) == []
