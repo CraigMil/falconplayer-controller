@@ -12,6 +12,8 @@ see the paths below.
 | `fpp-scoreboard.service` | `/etc/systemd/system/` |
 | `fpp-nfl.service` | `/etc/systemd/system/` |
 | `sudoers-fpp-nfl` | `/etc/sudoers.d/fpp-nfl` (mode 0440, root:root) |
+| `fpp-whatson.service` | `/etc/systemd/system/` |
+| `sudoers-fpp-whatson` | `/etc/sudoers.d/fpp-whatson` (mode 0440, root:root) |
 | `fpp-worldclock-control.service` | `/etc/systemd/system/` |
 
 The Python package itself is an **editable install** at
@@ -24,9 +26,10 @@ tar -czf - src/fpp | ssh fpp@192.168.1.66 \
 ssh fpp@192.168.1.66 "/home/fpp/fpp-panel-ctl.sh scoreboard restart"
 ```
 
-## The three display services
+## The four display services
 
-`fpp-worldclock.service`, `fpp-scoreboard.service` (soccer) and `fpp-nfl.service`
+`fpp-worldclock.service`, `fpp-scoreboard.service` (soccer), `fpp-nfl.service`
+and `fpp-whatson.service` (what is on today and tomorrow, and on what channel)
 are long-running loops that each drive the panel and **rebuild their own playlist
 every cycle**. Only one may run at a time — leaving both up makes them fight, and the display flickers
 between them every few seconds. `fpp-panel-ctl.sh start` stops the other one
@@ -36,7 +39,11 @@ For the same reason, playing an ordinary animation playlist means stopping both
 services first, or one of them takes the panel back part-way through. Home
 Assistant's `script.fpp_play_animation` does this.
 
-Neither is enabled at boot, so a reboot leaves the panel idle.
+None of them is enabled at boot, so a reboot leaves the panel idle.
+
+`fpp-whatson.service` needs two dependencies the others do not: `PyYAML` for its
+editable config files and `segno` for the highlight QR codes. A `pip install -e`
+into the venv brings both.
 
 ## The control API
 
@@ -51,7 +58,7 @@ GET  /status
 GET  /scoreboard/status
 ```
 
-Services: `worldclock`, `scoreboard`, `nfl`, `current`. Actions: `start`, `stop`,
+Services: `worldclock`, `scoreboard`, `nfl`, `whatson`, `current`. Actions: `start`, `stop`,
 `restart`, `status`. There is a per-unit rule in `/etc/sudoers.d/` for each, but
 it is **documentation of intent, not a constraint** — `010_pi-nopasswd` grants
 `fpp` blanket `NOPASSWD: ALL`, so the narrow rules restrict nothing. Adding a

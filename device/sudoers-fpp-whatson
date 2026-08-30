@@ -1,0 +1,1 @@
+fpp ALL=(root) NOPASSWD: /usr/bin/systemctl start fpp-whatson.service, /usr/bin/systemctl stop fpp-whatson.service, /usr/bin/systemctl restart fpp-whatson.service, /usr/bin/systemctl enable fpp-whatson.service, /usr/bin/systemctl disable fpp-whatson.service, /usr/bin/systemctl is-active fpp-whatson.service

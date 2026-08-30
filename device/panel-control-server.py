@@ -29,7 +29,7 @@ PORT = int(os.environ.get("WORLDCLOCK_CONTROL_PORT", "8090"))
 _ACTIONS = {"start", "stop", "restart", "status"}
 # "current" is not a unit — the ctl script resolves it to whichever display
 # service is live, or to the playing playlist when neither is.
-_SERVICES = {"worldclock", "scoreboard", "nfl", "current"}
+_SERVICES = {"worldclock", "scoreboard", "nfl", "whatson", "current"}
 _DEFAULT_SERVICE = "worldclock"
 
 

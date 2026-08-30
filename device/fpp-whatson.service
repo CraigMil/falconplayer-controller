@@ -1,0 +1,15 @@
+[Unit]
+Description=Falcon Player What's On board
+After=network-online.target fpp.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fpp
+Environment=FPP_HOST=127.0.0.1
+ExecStart=/home/fpp/fpp-worldclock-venv/bin/fpp --host 127.0.0.1 whatson --interval 12 --cycle 210
+Restart=on-failure
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target
