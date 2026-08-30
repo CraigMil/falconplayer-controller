@@ -12,6 +12,8 @@ dependencies = [
     "click>=8.1",
     "prometheus-client>=0.20",
     "Pillow>=9.0",
+    "PyYAML>=6.0",
+    "segno>=1.6",
 ]
 
 [project.scripts]

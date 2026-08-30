@@ -1,0 +1,10 @@
+# Always shown when they play, whatever the sport, channel or caps.
+# Match is on the ESPN competitor displayName, so use the full club name.
+- { slug: football/nfl,                        team: Seattle Seahawks }
+- { slug: baseball/mlb,                        team: Seattle Mariners }
+- { slug: hockey/nhl,                          team: Seattle Kraken }
+- { slug: soccer/usa.1,                        team: Seattle Sounders FC }
+- { slug: soccer/usa.nwsl,                     team: Seattle Reign FC }
+- { slug: basketball/wnba,                     team: Seattle Storm }
+- { slug: football/college-football,           team: Washington Huskies }
+- { slug: basketball/mens-college-basketball,  team: Washington Huskies }

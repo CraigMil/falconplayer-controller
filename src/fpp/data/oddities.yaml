@@ -1,0 +1,54 @@
+# Events ESPN does not carry. Dates more than a year out are approximate by
+# nature; a stale entry fails safe by simply not matching today or tomorrow.
+- name: PDC World Darts Championship
+  subtitle: Alexandra Palace
+  start: 2026-12-13
+  end: 2027-01-03
+  channel: ESPN+
+  major_from: 2026-12-30
+- name: World Snooker Championship
+  subtitle: The Crucible
+  start: 2027-04-17
+  end: 2027-05-03
+  channel: DAZN
+  major_from: 2027-04-30
+- name: Tour de France
+  subtitle: Grand Tour
+  start: 2027-07-03
+  end: 2027-07-25
+  channel: Peacock
+  major: true
+- name: Iditarod
+  subtitle: Anchorage to Nome
+  start: 2027-03-06
+  end: 2027-03-15
+  channel: ESPN+
+- name: World Chess Championship
+  subtitle: Title match
+  start: 2026-11-20
+  end: 2026-12-12
+  channel: ESPN+
+  major: true
+- name: 24 Hours of Le Mans
+  subtitle: Circuit de la Sarthe
+  start: 2027-06-12
+  end: 2027-06-13
+  channel: Max
+  major: true
+- name: Isle of Man TT
+  subtitle: Mountain Course
+  start: 2027-05-29
+  end: 2027-06-11
+  channel: ESPN+
+- name: WRC Rallye Monte-Carlo
+  subtitle: Round 1
+  start: 2027-01-21
+  end: 2027-01-24
+  channel: WRC+
+  major: true
+- name: WRC Safari Rally Kenya
+  subtitle: Naivasha
+  start: 2027-03-25
+  end: 2027-03-28
+  channel: WRC+
+  major: true

@@ -1,0 +1,47 @@
+# YouTube channel RSS. Match on title patterns, never "newest video" — these
+# channels post constant filler between events.
+#
+# Every channel_id below was resolved from the channel's own externalId and
+# verified against its live feed on 2026-08-29. Do not hand-write these: a
+# wrong id 404s, and by design a dead feed is skipped silently, so a typo
+# removes a source without any visible error.
+#
+# NOTE: EPL highlights are frequently geo-restricted in the US and RSS gives no
+# way to detect it, so an NBC Sports card can lead to a video that will not
+# play. Kept deliberately; see the spec.
+- name: Formula 1
+  sport: f1
+  channel_id: UCB_qr75-ydFVKSF9Dmo6izg
+  patterns: ["Race Highlights", "Qualifying Highlights", "Sprint Highlights"]
+- name: ATP Tour
+  sport: tennis
+  channel_id: UCY_5h5zaSwN7Or4kIJDYNXA
+  patterns: ["Highlights"]
+- name: WTA
+  sport: tennis
+  channel_id: UCaBIVVpHjq6j3tSyxwTE-8Q
+  patterns: ["Highlights"]
+- name: US Open Tennis
+  sport: tennis
+  channel_id: UCXbboag48Qlr78zzz6SkzkQ
+  patterns: ["Highlights"]
+- name: Wimbledon
+  sport: tennis
+  channel_id: UCNa8NxMgSm7m4Ii9d4QGk1Q
+  patterns: ["Highlights"]
+- name: NFL
+  sport: nfl
+  channel_id: UCDVYQ4Zhbm3S2dlz7P1GBDg
+  patterns: ["Highlights", "Game Highlights"]
+- name: ESPN College Football
+  sport: ncaaf
+  channel_id: UCzRWWsFjqHk1an4OnVPsl9g
+  patterns: ["Highlights"]
+- name: NBC Sports
+  sport: epl
+  channel_id: UCqZQlzSHbVJrwrn5XvzrzcA
+  patterns: ["Highlights"]
+- name: CBS Sports Golazo
+  sport: cup
+  channel_id: UCET00YnetHT7tOpu12v8jxg
+  patterns: ["Highlights", "Extended Highlights"]
