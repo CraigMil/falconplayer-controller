@@ -127,9 +127,13 @@ def _highlight(frame: Frame, card: dict) -> Frame:
     # Name the sport: "HIGHLIGHTS" alone left the viewer guessing what they were
     # about to scan.
     label = card.get("sport_label") or "HIGHLIGHTS"
-    frame.rect(0, 0, W, 14, LEAGUE_COLOURS.get(label, (35, 35, 35)))
-    frame.text(5, 7, f"{label} HIGHLIGHTS" if label != "HIGHLIGHTS" else label,
-               size=9, color=FG, anchor="lm")
+    # Colour by SPORT, not by the displayed label: a tournament name like
+    # "US OPEN" would never match the palette.
+    colour = LEAGUE_COLOURS.get(card.get("colour_key") or label, (35, 35, 35))
+    frame.rect(0, 0, W, 14, colour)
+    text = f"{label} HIGHLIGHTS" if label != "HIGHLIGHTS" else label
+    frame.text_fit(5 + 66, 7, text, max_width=132, size=9, min_size=7,
+                   color=FG, anchor="mm")
     frame.text(W - 5, 7, card.get("age", ""), size=9, color=DIM, anchor="rm")
 
     # 4px per module is the proven-scannable default. Smaller frees space for

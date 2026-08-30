@@ -8,6 +8,7 @@ patterns and never on "the newest video".
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta, timezone
 from xml.etree import ElementTree
 
@@ -41,6 +42,35 @@ def parse_feed(xml: str):
         if title and vid:
             out.append({"title": title, "video_id": vid, "published": when})
     return out
+
+
+# Real tennis titles look like:
+#   "Lumsden/Kozyreva vs. Joint/Xu | 2026 Monterrey Doubles Final | WTA Match Highlights"
+#   "Arthur Fery vs James Duckworth Highlights | 2026 Winston-Salem Semi-finals"
+#   "Bencic/Cobolli vs. Muchova/Mensik Full Match | 2026 US Open Final"
+# The tournament is the middle segment, behind a year and ahead of a round.
+_YEAR = re.compile(r"^\s*(19|20)\d{2}\s*")
+# Wimbledon puts the year at the END ("Wimbledon 2026") rather than the front.
+_YEAR_TAIL = re.compile(r"\s*(19|20)\d{2}\s*$")
+_ROUND_TAIL = re.compile(
+    r"\s*(?:men'?s|women'?s|mixed|doubles|singles|"
+    r"semi[\s-]?finals?|quarter[\s-]?finals?|finals?|"
+    r"round\s+of\s+\d+|r\d+|match\s+highlights?|full\s+match|highlights?)\s*$",
+    re.I)
+
+
+def tournament_label(title: str):
+    """The tournament from a tennis highlight title, or None if it is not there."""
+    parts = [p.strip() for p in title.split("|") if p.strip()]
+    if len(parts) < 2:
+        return None
+    seg = _YEAR_TAIL.sub("", _YEAR.sub("", parts[1]))
+    prev = None
+    while prev != seg:                      # peel round words off the end
+        prev = seg
+        seg = _ROUND_TAIL.sub("", seg).strip(" -–")
+    seg = re.sub(r"\s*-\s*", "-", seg).strip()
+    return seg.upper() or None
 
 
 def matches(entry: dict, patterns) -> bool:
@@ -80,13 +110,19 @@ def select(entries_by_source, now: datetime, patterns_by_source, sports_by_sourc
         # while ESPN and the tennis tours post a bare "A vs. B". Splitting on the
         # pipe unconditionally makes the title and subtitle the same string.
         raw = entry["title"]
+        base_label = (sports_by_source or {}).get(source, "").upper() or "HIGHLIGHTS"
         if "|" in raw:
             head, tail = raw.split("|", 1)
         else:
             head, tail = raw, source
         cards.append({
             "kind": "highlight", "sport": "highlight", "source": source,
-            "sport_label": (sports_by_source or {}).get(source, "").upper() or "HIGHLIGHTS",
+            # Tennis names the tournament rather than the sport — "US OPEN
+            # HIGHLIGHTS" beats "TENNIS HIGHLIGHTS" when the tournament is
+            # right there in the title.
+            "sport_label": (tournament_label(raw) if base_label == "TENNIS" else None)
+                           or base_label,
+            "colour_key": base_label,
             # Generous: the card now shrinks text to fit across two lines, so
             # clipping here only ever loses a real competitor's name.
             "title": head.strip().upper()[:60],

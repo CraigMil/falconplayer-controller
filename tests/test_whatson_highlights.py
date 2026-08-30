@@ -3,7 +3,14 @@
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from fpp.displays.whatson.highlights import matches, parse_feed, select
+import pytest
+
+from fpp.displays.whatson.highlights import (
+    matches,
+    parse_feed,
+    select,
+    tournament_label,
+)
 
 FEED = (Path(__file__).parent / "fixtures" / "youtube" / "f1_feed.xml").read_text()
 NOW = datetime(2026, 8, 29, 14, 0, tzinfo=timezone.utc)
@@ -99,3 +106,32 @@ def test_the_same_game_posted_by_two_channels_appears_once():
     cards = select({"ESPN": [same], "ACC": [dupe]}, NOW,
                    {"ESPN": ["Highlights"], "ACC": ["Highlights"]})
     assert len(cards) == 1
+
+
+@pytest.mark.parametrize("title,expected", [
+    ("A vs. B | 2026 Monterrey Doubles Final | WTA Match Highlights", "MONTERREY"),
+    ("A vs B Highlights | 2026 Winston-Salem Semi-finals", "WINSTON-SALEM"),
+    ("A vs. B Full Match | 2026 US Open Final", "US OPEN"),
+    ("A vs B | Winston - Salem Final", "WINSTON-SALEM"),
+    ("A vs B Full Match Replay | Wimbledon 2026", "WIMBLEDON"),
+    ("No pipe here at all", None),
+])
+def test_tournament_label_from_real_title_shapes(title, expected):
+    assert tournament_label(title) == expected
+
+
+def test_tennis_cards_show_the_tournament_and_keep_the_sport_colour():
+    entry = {"title": "A vs. B | 2026 US Open Final | Highlights",
+             "video_id": "u", "published": NOW - timedelta(hours=1)}
+    card = select({"US Open Tennis": [entry]}, NOW,
+                  {"US Open Tennis": ["Highlights"]}, {"US Open Tennis": "TENNIS"})[0]
+    assert card["sport_label"] == "US OPEN"
+    assert card["colour_key"] == "TENNIS"
+
+
+def test_non_tennis_cards_keep_the_plain_sport_label():
+    entry = {"title": "Italian GP | Race Highlights", "video_id": "z",
+             "published": NOW - timedelta(hours=1)}
+    card = select({"Formula 1": [entry]}, NOW, {"Formula 1": PATTERNS},
+                  {"Formula 1": "F1"})[0]
+    assert card["sport_label"] == "F1"
