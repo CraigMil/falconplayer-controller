@@ -4,6 +4,7 @@ this display exists to answer.
 
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 from io import BytesIO
 
@@ -112,18 +113,41 @@ def _empty(frame: Frame, card: dict) -> Frame:
     return frame
 
 
+# " Wolfpack vs. Virginia " and friends. Splitting the matchup across two lines
+# is worth far more than a subtitle: one squeezed line truncated real names.
+_VS = re.compile(r"\s+(?:vs\.?|v\.?|versus)\s+", re.I)
+
+
 def _highlight(frame: Frame, card: dict) -> Frame:
     from .qr import qr_image
 
-    frame.rect(0, 0, W, 22, (35, 35, 35))
-    frame.text(6, 11, "HIGHLIGHTS", size=12, color=FG, anchor="lm")
-    frame.text(W - 6, 11, card.get("age", ""), size=11, color=DIM, anchor="rm")
-    frame.text_fit(W // 2, 33, card.get("title", ""), max_width=W - 12,
-                   size=14, color=FG, anchor="mm")
-    frame.text_fit(W // 2, 49, card.get("subtitle", ""), max_width=W - 12,
-                   size=11, color=DIM, anchor="mm")
+    # The QR scans reliably at 4px per module and must not shrink, so the space
+    # for names is reclaimed from the header instead: a slim 14px bar rather
+    # than a 22px one, and no separate subtitle line when there is a matchup.
+    frame.rect(0, 0, W, 14, (35, 35, 35))
+    frame.text(5, 7, "HIGHLIGHTS", size=9, color=DIM, anchor="lm")
+    frame.text(W - 5, 7, card.get("age", ""), size=9, color=DIM, anchor="rm")
+
     img = qr_image(card.get("url", ""), module_px=4)
-    frame.paste(img, (W - img.width) // 2, min(58, H - img.height))
+    qr_y = H - img.height
+    frame.paste(img, (W - img.width) // 2, qr_y)
+
+    title = card.get("title", "")
+    parts = _VS.split(title, maxsplit=1)
+    top, bottom = 14, qr_y
+    if len(parts) == 2:
+        # Two competitors, one per line, with the whole band to themselves.
+        frame.text_fit(W // 2, top + (bottom - top) * 0.26, parts[0].strip(),
+                       max_width=W - 8, size=15, min_size=8, color=FG, anchor="mm")
+        frame.text_fit(W // 2, top + (bottom - top) * 0.55, "vs", max_width=40,
+                       size=9, min_size=7, color=DIM, anchor="mm")
+        frame.text_fit(W // 2, top + (bottom - top) * 0.80, parts[1].strip(),
+                       max_width=W - 8, size=15, min_size=8, color=FG, anchor="mm")
+    else:
+        frame.text_fit(W // 2, top + (bottom - top) * 0.35, title,
+                       max_width=W - 8, size=16, min_size=8, color=FG, anchor="mm")
+        frame.text_fit(W // 2, top + (bottom - top) * 0.75, card.get("subtitle", ""),
+                       max_width=W - 8, size=12, min_size=7, color=DIM, anchor="mm")
     return frame
 
 

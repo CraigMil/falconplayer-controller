@@ -44,3 +44,18 @@ def test_highlight_card_renders_with_a_qr():
                 subtitle="Race Highlights", age="2h",
                 url="https://youtu.be/dQw4w9WgXcQ", dwell_floor=15.0)
     assert render(card).to_image_bytes()[:2] == b"\xff\xd8"
+
+
+def test_highlight_card_splits_a_matchup_onto_two_lines():
+    card = dict(kind="highlight", sport="highlight",
+                title="NC STATE WOLFPACK VS. VIRGINIA CAVALIERS",
+                subtitle="ESPN College Football", age="1h",
+                url="https://youtu.be/dQw4w9WgXcQ", dwell_floor=15.0)
+    assert render(card).to_image_bytes()[:2] == b"\xff\xd8"
+
+
+def test_highlight_card_without_a_matchup_still_renders():
+    card = dict(kind="highlight", sport="highlight", title="ITALIAN GP",
+                subtitle="Race Highlights", age="2h",
+                url="https://youtu.be/dQw4w9WgXcQ", dwell_floor=15.0)
+    assert render(card).to_image_bytes()[:2] == b"\xff\xd8"

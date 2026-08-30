@@ -77,7 +77,9 @@ def test_a_title_without_a_pipe_uses_the_source_as_subtitle():
              "video_id": "x", "published": NOW - timedelta(hours=1)}
     card = select({"ESPN College Football": [entry]}, NOW,
                   {"ESPN College Football": ["vs."]})[0]
-    assert card["title"] == "NC STATE WOLFPACK VS. VIRGINIA"
+    # Not truncated any more: the card splits on "vs" and shrinks to fit, so
+    # clipping here would only ever lose a real competitor's name.
+    assert card["title"] == "NC STATE WOLFPACK VS. VIRGINIA CAVALIERS"
     assert card["subtitle"] == "ESPN College Football"
 
 

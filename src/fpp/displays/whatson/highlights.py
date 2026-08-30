@@ -86,7 +86,9 @@ def select(entries_by_source, now: datetime, patterns_by_source):
             head, tail = raw, source
         cards.append({
             "kind": "highlight", "sport": "highlight", "source": source,
-            "title": head.strip().upper()[:30],
+            # Generous: the card now shrinks text to fit across two lines, so
+            # clipping here only ever loses a real competitor's name.
+            "title": head.strip().upper()[:60],
             "subtitle": tail.strip()[:26],
             "url": f"https://youtu.be/{entry['video_id']}",
             "age": _age(entry["published"], now),
