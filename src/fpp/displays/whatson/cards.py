@@ -128,7 +128,9 @@ def _highlight(frame: Frame, card: dict) -> Frame:
     frame.text(5, 7, "HIGHLIGHTS", size=9, color=DIM, anchor="lm")
     frame.text(W - 5, 7, card.get("age", ""), size=9, color=DIM, anchor="rm")
 
-    img = qr_image(card.get("url", ""), module_px=4)
+    # 4px per module is the proven-scannable default. Smaller frees space for
+    # names but shrinks the target a phone camera has to lock onto.
+    img = qr_image(card.get("url", ""), module_px=int(card.get("qr_px") or 4))
     qr_y = H - img.height
     frame.paste(img, (W - img.width) // 2, qr_y)
 

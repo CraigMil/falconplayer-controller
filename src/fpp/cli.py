@@ -886,12 +886,14 @@ def _whatson_dwell(slides: list, interval: float, cycle: float,
 @click.option("--live-refresh", default=60.0, help="Seconds between fetches while live.")
 @click.option("--practice", is_flag=True, help="Include F1 practice sessions.")
 @click.option("--no-highlights", is_flag=True, help="Skip the YouTube highlight block.")
+@click.option("--qr-px", default=4, type=click.IntRange(2, 6),
+              help="LEDs per QR module. 4 is proven scannable; 3 frees ~33px for names.")
 @click.option("--dry-run", is_flag=True, help="Write PNGs locally instead of touching the panel.")
 @click.option("--out", default="/tmp/whatson", help="Where --dry-run writes its cards.")
 @click.pass_context
 def whatson(ctx: click.Context, interval: float, cycle: float, min_interval: float,
             refresh: float, live_refresh: float, practice: bool,
-            no_highlights: bool, dry_run: bool, out: str) -> None:
+            no_highlights: bool, qr_px: int, dry_run: bool, out: str) -> None:
     """Show what sport is on today and tomorrow, and where to watch it.
 
     A schedule board, not a scoreboard: it surveys the Premier League, the NFL,
@@ -913,6 +915,12 @@ def whatson(ctx: click.Context, interval: float, cycle: float, min_interval: flo
     from .displays.whatson.cards import render
 
     host = ctx.obj["host"]
+
+    def _with_qr(slides: list) -> list:
+        for s in slides:
+            if s.get("kind") == "highlight":
+                s["qr_px"] = qr_px
+        return slides
 
     def _image_entry(filename: str) -> dict:
         return {"type": "image", "enabled": 1, "playOnce": 0, "imagePath": filename,
@@ -936,6 +944,7 @@ def whatson(ctx: click.Context, interval: float, cycle: float, min_interval: flo
     if dry_run:
         slides, reason = _w.build_board(include_practice=practice,
                                         with_highlights=not no_highlights)
+        _with_qr(slides)
         Path(out).mkdir(parents=True, exist_ok=True)
         # A shorter board than last time would otherwise leave stale cards
         # behind, and they look exactly like real ones.
@@ -953,6 +962,7 @@ def whatson(ctx: click.Context, interval: float, cycle: float, min_interval: flo
         while True:
             slides, reason = _w.build_board(include_practice=practice,
                                             with_highlights=not no_highlights)
+            _with_qr(slides)
             dwells = _whatson_dwell(slides, interval, cycle, min_interval)
             entries = []
             with _client(host) as fpp:

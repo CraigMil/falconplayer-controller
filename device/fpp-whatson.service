@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=simple
 User=fpp
 Environment=FPP_HOST=127.0.0.1
-ExecStart=/home/fpp/fpp-worldclock-venv/bin/fpp --host 127.0.0.1 whatson --interval 12 --cycle 210
+ExecStart=/home/fpp/fpp-worldclock-venv/bin/fpp --host 127.0.0.1 whatson --interval 12 --cycle 210 --qr-px 3
 Restart=on-failure
 RestartSec=15
 
