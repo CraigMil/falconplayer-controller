@@ -4,7 +4,12 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fpp.displays.whatson.sources import from_match, from_sessions, from_tournament
+from fpp.displays.whatson.sources import (
+    from_match,
+    from_multiday,
+    from_sessions,
+    from_tournament,
+)
 
 FIX = Path(__file__).parent / "fixtures" / "espn"
 NOW = datetime(2026, 8, 29, 14, 0, tzinfo=timezone.utc)
@@ -83,3 +88,33 @@ def test_f1_race_and_sprint_are_major_but_qualifying_is_not():
 
 def test_empty_league_yields_nothing():
     assert load("facup_empty")["events"] == []
+
+
+def test_golf_tournament_becomes_an_also_on_card():
+    ev = load("golf_pga")["events"][0]
+    # The TOUR Championship runs 27-30 Aug, so it spans the window without
+    # starting inside it — the case a naive bucket() check misses.
+    card = from_multiday(ev, "golf", NOW)
+    assert card is not None
+    assert card["layout"] == "single"
+    assert card["title"] == "TOUR CHAMPIONSHIP"
+    assert card["tier"] == "watchable"
+
+
+def test_ufc_card_names_the_main_event():
+    ev = load("ufc")["events"][0]
+    card = from_multiday(ev, "ufc", NOW)
+    assert card is not None
+    assert "UFC" in card["title"]
+    assert "Nurmagomedov" in card["subtitle"], "the main event is the draw"
+    assert card["channel"] == "Paramount+"
+
+
+def test_an_out_of_window_multiday_event_is_dropped():
+    ev = load("golf_pga")["events"][0]
+    far = datetime(2026, 12, 25, 18, 0, tzinfo=timezone.utc)
+    assert from_multiday(ev, "golf", far) is None
+
+
+def test_boxing_out_of_season_yields_nothing():
+    assert load("boxing_empty")["events"] == []

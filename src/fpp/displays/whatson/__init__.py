@@ -19,6 +19,7 @@ _MATCH = ["nfl", "ncaaf", "epl", "ucl", "uel", "facup", "libertadores",
           "sudamericana", "concacaf"]
 _TOURNAMENT = ["atp", "wta"]
 _SESSION = ["f1"]
+_MULTIDAY = ["golf", "golf_lpga", "golf_eur", "golf_champions", "ufc", "boxing"]
 _HOME_ONLY = ["mlb", "nhl", "mls", "nwsl", "wnba", "ncaab"]
 
 
@@ -59,7 +60,9 @@ def build_board(now=None, include_practice: bool = False,
     seen_tournaments = set()
     for key in _TOURNAMENT:
         for event in _events(key, dated=False):
-            card = sources.from_tournament(event, key, now)
+            # require_major=False so the minor tournaments come back too — they
+            # carry bucket="oddity" and feed the ALSO ON slot.
+            card = sources.from_tournament(event, key, now, require_major=False)
             if card and card["title"] not in seen_tournaments:
                 seen_tournaments.add(card["title"])
                 collected.append(card)
@@ -67,6 +70,14 @@ def build_board(now=None, include_practice: bool = False,
     for key in _SESSION:
         for event in _events(key, dated=False):
             collected += sources.from_sessions(event, key, now, include_practice)
+
+    # Undated for the same reason as tennis and F1: these are multi-day events,
+    # and a date range hides one already under way.
+    for key in _MULTIDAY:
+        for event in _events(key, dated=False):
+            card = sources.from_multiday(event, key, now)
+            if card:
+                collected.append(card)
 
     collected = select.mark_home(collected)
     collected += select.oddity_cards(now)
@@ -82,6 +93,7 @@ def build_board(now=None, include_practice: bool = False,
     rest = [c for c in rest if c["tier"] == "watchable" or c.get("major")]
 
     picked = select.apply_caps(rest)
+    picked = select.guarantee_oddity(picked, rest)
     hl = highlights.fetch_all(now) if with_highlights else []
     slides = select.assemble(home, picked, hl, now)
 

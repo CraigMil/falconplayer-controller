@@ -1,0 +1,796 @@
+{
+ "leagues": [
+  {
+   "id": "1106",
+   "uid": "s:1100~l:1106",
+   "name": "PGA TOUR",
+   "abbreviation": "PGA",
+   "slug": "pga",
+   "season": {
+    "year": 2026,
+    "startDate": "2026-01-08T05:00Z",
+    "endDate": "2026-12-13T05:00Z",
+    "displayName": "2026",
+    "type": {
+     "id": "2",
+     "type": 2,
+     "name": "Regular Season",
+     "abbreviation": "reg"
+    }
+   },
+   "logos": [
+    {
+     "href": "https://a.espncdn.com/combiner/i?img=/i/teamlogos/leagues/500/pgatour.png",
+     "width": 500,
+     "height": 500,
+     "alt": "",
+     "rel": [
+      "full",
+      "default"
+     ],
+     "lastUpdated": "2026-08-29T21:56Z"
+    },
+    {
+     "href": "https://a.espncdn.com/combiner/i?img=/i/teamlogos/leagues/500-dark/pgatour.png",
+     "width": 500,
+     "height": 500,
+     "alt": "",
+     "rel": [
+      "full",
+      "dark"
+     ],
+     "lastUpdated": "2026-08-29T08:29Z"
+    }
+   ],
+   "calendarType": "list",
+   "calendarIsWhitelist": true,
+   "calendarStartDate": "2026-01-08T05:00Z",
+   "calendarEndDate": "2026-12-13T05:00Z",
+   "calendar": [
+    {
+     "id": "401811927",
+     "label": "The Sentry",
+     "startDate": "2026-01-08T08:00Z",
+     "endDate": "2026-01-11T08:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811927?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811928",
+     "label": "Sony Open in Hawaii",
+     "startDate": "2026-01-15T08:00Z",
+     "endDate": "2026-01-18T08:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811928?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811929",
+     "label": "The American Express",
+     "startDate": "2026-01-22T08:00Z",
+     "endDate": "2026-01-25T08:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811929?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811930",
+     "label": "Farmers Insurance Open",
+     "startDate": "2026-01-29T08:00Z",
+     "endDate": "2026-02-01T08:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811930?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811931",
+     "label": "WM Phoenix Open",
+     "startDate": "2026-02-05T08:00Z",
+     "endDate": "2026-02-08T08:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811931?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811932",
+     "label": "AT&T Pebble Beach Pro-Am",
+     "startDate": "2026-02-12T08:00Z",
+     "endDate": "2026-02-15T08:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811932?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811933",
+     "label": "The Genesis Invitational",
+     "startDate": "2026-02-19T08:00Z",
+     "endDate": "2026-02-22T08:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811933?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811934",
+     "label": "Cognizant Classic in The Palm Beaches",
+     "startDate": "2026-02-26T08:00Z",
+     "endDate": "2026-03-01T08:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811934?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811935",
+     "label": "Arnold Palmer Invitational pres. by Mastercard",
+     "startDate": "2026-03-05T08:00Z",
+     "endDate": "2026-03-08T08:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811935?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811936",
+     "label": "Puerto Rico Open",
+     "startDate": "2026-03-05T08:00Z",
+     "endDate": "2026-03-08T08:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811936?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811937",
+     "label": "THE PLAYERS Championship",
+     "startDate": "2026-03-12T07:00Z",
+     "endDate": "2026-03-15T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811937?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811938",
+     "label": "Valspar Championship",
+     "startDate": "2026-03-19T07:00Z",
+     "endDate": "2026-03-22T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811938?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811939",
+     "label": "Texas Children's Houston Open",
+     "startDate": "2026-03-26T07:00Z",
+     "endDate": "2026-03-29T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811939?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811940",
+     "label": "Valero Texas Open",
+     "startDate": "2026-04-02T07:00Z",
+     "endDate": "2026-04-05T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811940?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811941",
+     "label": "Masters Tournament",
+     "startDate": "2026-04-09T07:00Z",
+     "endDate": "2026-04-12T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811941?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811942",
+     "label": "RBC Heritage",
+     "startDate": "2026-04-16T07:00Z",
+     "endDate": "2026-04-19T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811942?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811943",
+     "label": "Zurich Classic of New Orleans",
+     "startDate": "2026-04-23T07:00Z",
+     "endDate": "2026-04-26T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811943?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811944",
+     "label": "Cadillac Championship",
+     "startDate": "2026-04-30T07:00Z",
+     "endDate": "2026-05-03T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811944?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811945",
+     "label": "Truist Championship",
+     "startDate": "2026-05-07T07:00Z",
+     "endDate": "2026-05-10T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811945?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811946",
+     "label": "ONEflight Myrtle Beach Classic",
+     "startDate": "2026-05-07T07:00Z",
+     "endDate": "2026-05-10T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811946?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811947",
+     "label": "PGA Championship",
+     "startDate": "2026-05-14T07:00Z",
+     "endDate": "2026-05-17T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811947?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811948",
+     "label": "THE CJ CUP Byron Nelson",
+     "startDate": "2026-05-21T07:00Z",
+     "endDate": "2026-05-24T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811948?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811949",
+     "label": "Charles Schwab Challenge",
+     "startDate": "2026-05-28T07:00Z",
+     "endDate": "2026-05-31T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811949?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811950",
+     "label": "the Memorial Tournament pres. by Workday",
+     "startDate": "2026-06-04T07:00Z",
+     "endDate": "2026-06-07T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811950?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811951",
+     "label": "RBC Canadian Open",
+     "startDate": "2026-06-11T07:00Z",
+     "endDate": "2026-06-14T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811951?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811952",
+     "label": "U.S. Open",
+     "startDate": "2026-06-18T07:00Z",
+     "endDate": "2026-06-21T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811952?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811953",
+     "label": "Travelers Championship",
+     "startDate": "2026-06-25T07:00Z",
+     "endDate": "2026-06-29T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811953?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811954",
+     "label": "John Deere Classic",
+     "startDate": "2026-07-02T07:00Z",
+     "endDate": "2026-07-05T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811954?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811955",
+     "label": "Genesis Scottish Open",
+     "startDate": "2026-07-09T07:00Z",
+     "endDate": "2026-07-12T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811955?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811956",
+     "label": "ISCO Championship",
+     "startDate": "2026-07-09T07:00Z",
+     "endDate": "2026-07-12T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811956?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811957",
+     "label": "The Open",
+     "startDate": "2026-07-16T07:00Z",
+     "endDate": "2026-07-19T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811957?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811958",
+     "label": "Corales Puntacana Championship",
+     "startDate": "2026-07-16T07:00Z",
+     "endDate": "2026-07-19T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811958?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811959",
+     "label": "3M Open",
+     "startDate": "2026-07-23T07:00Z",
+     "endDate": "2026-07-26T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811959?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811960",
+     "label": "Rocket Classic",
+     "startDate": "2026-07-30T07:00Z",
+     "endDate": "2026-08-02T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811960?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811961",
+     "label": "Wyndham Championship",
+     "startDate": "2026-08-06T07:00Z",
+     "endDate": "2026-08-09T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811961?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811962",
+     "label": "FedEx St. Jude Championship",
+     "startDate": "2026-08-13T07:00Z",
+     "endDate": "2026-08-16T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811962?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811963",
+     "label": "BMW Championship",
+     "startDate": "2026-08-20T07:00Z",
+     "endDate": "2026-08-23T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811963?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401811964",
+     "label": "TOUR Championship",
+     "startDate": "2026-08-27T07:00Z",
+     "endDate": "2026-08-30T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401811964?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401850914",
+     "label": "Biltmore Championship Asheville",
+     "startDate": "2026-09-17T07:00Z",
+     "endDate": "2026-09-20T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401850914?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401824815",
+     "label": "Presidents Cup",
+     "startDate": "2026-09-24T07:00Z",
+     "endDate": "2026-09-27T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401824815?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401850915",
+     "label": "Bank of Utah Championship",
+     "startDate": "2026-10-01T07:00Z",
+     "endDate": "2026-10-04T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401850915?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401850916",
+     "label": "Baycurrent Classic",
+     "startDate": "2026-10-08T07:00Z",
+     "endDate": "2026-10-11T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401850916?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401850917",
+     "label": "Butterfield Bermuda Championship",
+     "startDate": "2026-10-22T07:00Z",
+     "endDate": "2026-10-25T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401850917?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401850978",
+     "label": "VidantaWorld Mexico Open",
+     "startDate": "2026-10-29T07:00Z",
+     "endDate": "2026-11-01T07:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401850978?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401850979",
+     "label": "World Wide Technology Championship",
+     "startDate": "2026-11-05T08:00Z",
+     "endDate": "2026-11-08T08:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401850979?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401850980",
+     "label": "Austin Championship",
+     "startDate": "2026-11-12T08:00Z",
+     "endDate": "2026-11-15T08:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401850980?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401850981",
+     "label": "The RSM Classic",
+     "startDate": "2026-11-19T08:00Z",
+     "endDate": "2026-11-22T08:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401850981?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401850982",
+     "label": "Hero World Challenge",
+     "startDate": "2026-12-03T08:00Z",
+     "endDate": "2026-12-06T08:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401850982?lang=en&region=us"
+     }
+    },
+    {
+     "id": "401909147",
+     "label": "PGA TOUR Q-School presented by Korn Ferry",
+     "startDate": "2026-12-10T08:00Z",
+     "endDate": "2026-12-13T08:00Z",
+     "event": {
+      "$ref": "http://sports.core.api.espn.pvt/v2/sports/golf/leagues/pga/events/401909147?lang=en&region=us"
+     }
+    }
+   ]
+  }
+ ],
+ "season": {
+  "type": 2,
+  "year": 2026
+ },
+ "day": {
+  "date": "2026-08-29"
+ },
+ "events": [
+  {
+   "id": "401811964",
+   "uid": "s:1100~l:1106~e:401811964",
+   "date": "2026-08-27T04:00Z",
+   "endDate": "2026-08-30T04:00Z",
+   "name": "TOUR Championship",
+   "shortName": "TOUR Championship",
+   "season": {
+    "year": 2026,
+    "type": 2,
+    "slug": "regular-season"
+   },
+   "competitions": [
+    {
+     "id": "401811964",
+     "uid": "s:1100~l:1106~e:401811964~c:401811964",
+     "date": "2026-08-27T04:00Z",
+     "endDate": "2026-08-30T04:00Z",
+     "timeValid": false,
+     "neutralSite": false,
+     "conferenceCompetition": false,
+     "playByPlayAvailable": false,
+     "recent": true,
+     "competitors": [
+      {
+       "id": "4364873",
+       "uid": "s:1100~l:1106~a:4364873",
+       "type": "athlete",
+       "order": 1,
+       "athlete": {
+        "fullName": "Viktor Hovland",
+        "displayName": "Viktor Hovland",
+        "shortName": "V. Hovland",
+        "flag": {
+         "href": "https://a.espncdn.com/i/teamlogos/countries/500/nor.png",
+         "alt": "Norway",
+         "rel": [
+          "country-flag"
+         ]
+        }
+       },
+       "score": "-15"
+      },
+      {
+       "id": "5076021",
+       "uid": "s:1100~l:1106~a:5076021",
+       "type": "athlete",
+       "order": 2,
+       "athlete": {
+        "fullName": "Ryan Gerard",
+        "displayName": "Ryan Gerard",
+        "shortName": "R. Gerard",
+        "flag": {
+         "href": "https://a.espncdn.com/i/teamlogos/countries/500/usa.png",
+         "alt": "USA",
+         "rel": [
+          "country-flag"
+         ]
+        }
+       },
+       "score": "-14"
+      },
+      {
+       "id": "388",
+       "uid": "s:1100~l:1106~a:388",
+       "type": "athlete",
+       "order": 3,
+       "athlete": {
+        "fullName": "Adam Scott",
+        "displayName": "Adam Scott",
+        "shortName": "A. Scott",
+        "flag": {
+         "href": "https://a.espncdn.com/i/teamlogos/countries/500/aus.png",
+         "alt": "Australia",
+         "rel": [
+          "country-flag"
+         ]
+        }
+       },
+       "score": "-12"
+      },
+      {
+       "id": "4375972",
+       "uid": "s:1100~l:1106~a:4375972",
+       "type": "athlete",
+       "order": 4,
+       "athlete": {
+        "fullName": "Ludvig \u00c5berg",
+        "displayName": "Ludvig \u00c5berg",
+        "shortName": "L. \u00c5berg",
+        "flag": {
+         "href": "https://a.espncdn.com/i/teamlogos/countries/500/swe.png",
+         "alt": "Sweden",
+         "rel": [
+          "country-flag"
+         ]
+        }
+       },
+       "score": "-12"
+      },
+      {
+       "id": "9478",
+       "uid": "s:1100~l:1106~a:9478",
+       "type": "athlete",
+       "order": 5,
+       "athlete": {
+        "fullName": "Scottie Scheffler",
+        "displayName": "Scottie Scheffler",
+        "shortName": "S. Scheffler",
+        "flag": {
+         "href": "https://a.espncdn.com/i/teamlogos/countries/500/usa.png",
+         "alt": "USA",
+         "rel": [
+          "country-flag"
+         ]
+        }
+       },
+       "score": "-12"
+      },
+      {
+       "id": "4690755",
+       "uid": "s:1100~l:1106~a:4690755",
+       "type": "athlete",
+       "order": 6,
+       "athlete": {
+        "fullName": "Chris Gotterup",
+        "displayName": "Chris Gotterup",
+        "shortName": "C. Gotterup",
+        "flag": {
+         "href": "https://a.espncdn.com/i/teamlogos/countries/500/usa.png",
+         "alt": "USA",
+         "rel": [
+          "country-flag"
+         ]
+        }
+       },
+       "score": "-12"
+      }
+     ],
+     "status": {
+      "period": 3,
+      "type": {
+       "id": "35",
+       "name": "STATUS_PLAY_COMPLETE",
+       "state": "post",
+       "completed": true,
+       "description": "Play Complete",
+       "detail": "Round 3 - Play Complete",
+       "shortDetail": "Round 3 - Play Complete"
+      }
+     },
+     "broadcasts": [
+      {
+       "market": "national",
+       "names": [
+        "ESPN",
+        "ESPN+",
+        "CBS",
+        "Golf Chnl",
+        "Paramount+"
+       ]
+      }
+     ],
+     "startDate": "2026-08-27T04:00Z",
+     "broadcast": "ESPN/ESPN+/CBS/Golf Chnl/Paramount+",
+     "geoBroadcasts": [
+      {
+       "type": {
+        "id": "1",
+        "shortName": "TV"
+       },
+       "market": {
+        "id": "1",
+        "type": "National"
+       },
+       "media": {
+        "shortName": "ESPN",
+        "logo": "https://a.espncdn.com/guid/335fd2d2-97b9-336b-81ee-573eb6bdcffc/logos/default.png",
+        "darkLogo": ""
+       },
+       "lang": "en",
+       "region": "us"
+      },
+      {
+       "type": {
+        "id": "1",
+        "shortName": "TV"
+       },
+       "market": {
+        "id": "1",
+        "type": "National"
+       },
+       "media": {
+        "shortName": "ESPN+",
+        "logo": "https://a.espncdn.com/guid/322a7e47-3cdb-3b5c-ab1b-678e1f2c27e5/logos/default.png",
+        "darkLogo": "https://a.espncdn.com/guid/322a7e47-3cdb-3b5c-ab1b-678e1f2c27e5/logos/default-dark.png"
+       },
+       "lang": "en",
+       "region": "us"
+      },
+      {
+       "type": {
+        "id": "1",
+        "shortName": "TV"
+       },
+       "market": {
+        "id": "1",
+        "type": "National"
+       },
+       "media": {
+        "shortName": "CBS"
+       },
+       "lang": "en",
+       "region": "us"
+      },
+      {
+       "type": {
+        "id": "1",
+        "shortName": "TV"
+       },
+       "market": {
+        "id": "1",
+        "type": "National"
+       },
+       "media": {
+        "shortName": "Golf Chnl"
+       },
+       "lang": "en",
+       "region": "us"
+      },
+      {
+       "type": {
+        "id": "1",
+        "shortName": "TV"
+       },
+       "market": {
+        "id": "1",
+        "type": "National"
+       },
+       "media": {
+        "shortName": "Paramount+"
+       },
+       "lang": "en",
+       "region": "us"
+      }
+     ],
+     "highlights": []
+    }
+   ],
+   "links": [
+    {
+     "language": "en-US",
+     "rel": [
+      "summary",
+      "desktop",
+      "event"
+     ],
+     "href": "https://www.espn.com/golf/leaderboard?tournamentId=401811964",
+     "text": "Gamecast",
+     "shortText": "Gamecast",
+     "isExternal": false,
+     "isPremium": false
+    },
+    {
+     "language": "en-US",
+     "rel": [
+      "recurringevent",
+      "desktop",
+      "event"
+     ],
+     "href": "https://www.espn.com/golf/leaderboard?tournamentId=401811964",
+     "text": "Event",
+     "shortText": "Event",
+     "isExternal": false,
+     "isPremium": false
+    }
+   ],
+   "status": {
+    "type": {
+     "id": "2",
+     "name": "STATUS_IN_PROGRESS",
+     "state": "in",
+     "completed": false,
+     "description": "In Progress"
+    }
+   }
+  }
+ ],
+ "provider": {
+  "id": "100",
+  "name": "Draft Kings",
+  "displayName": "Draft Kings",
+  "priority": 1
+ }
+}

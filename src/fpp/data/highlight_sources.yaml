@@ -11,37 +11,49 @@
 # play. Kept deliberately; see the spec.
 - name: Formula 1
   sport: f1
+  label: F1
   channel_id: UCB_qr75-ydFVKSF9Dmo6izg
   patterns: ["Race Highlights", "Qualifying Highlights", "Sprint Highlights"]
 - name: ATP Tour
   sport: tennis
+  label: TENNIS
   channel_id: UCY_5h5zaSwN7Or4kIJDYNXA
   patterns: ["Highlights"]
 - name: WTA
   sport: tennis
+  label: TENNIS
   channel_id: UCaBIVVpHjq6j3tSyxwTE-8Q
   patterns: ["Highlights"]
 - name: US Open Tennis
   sport: tennis
+  label: TENNIS
   channel_id: UCXbboag48Qlr78zzz6SkzkQ
   patterns: ["Highlights"]
 - name: Wimbledon
   sport: tennis
+  label: TENNIS
   channel_id: UCNa8NxMgSm7m4Ii9d4QGk1Q
   patterns: ["Highlights"]
 - name: NFL
   sport: nfl
+  label: NFL
   channel_id: UCDVYQ4Zhbm3S2dlz7P1GBDg
   patterns: ["Highlights", "Game Highlights"]
 - name: ESPN College Football
   sport: ncaaf
+  label: NCAAF
   channel_id: UCzRWWsFjqHk1an4OnVPsl9g
   patterns: ["Highlights"]
+# NBC Sports is MULTI-SPORT: it posts college football and golf alongside the
+# Premier League, so a bare "Highlights" pattern mislabelled a San Jose State
+# game as EPL. Narrow the pattern to the sport we want from this channel.
 - name: NBC Sports
   sport: epl
+  label: EPL
   channel_id: UCqZQlzSHbVJrwrn5XvzrzcA
-  patterns: ["Highlights"]
+  patterns: ["Premier League"]
 - name: CBS Sports Golazo
   sport: cup
+  label: SOCCER
   channel_id: UCET00YnetHT7tOpu12v8jxg
   patterns: ["Highlights", "Extended Highlights"]

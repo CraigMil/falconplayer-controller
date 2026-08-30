@@ -35,6 +35,12 @@ SLUGS = {
     "nwsl": "soccer/usa.nwsl",
     "wnba": "basketball/wnba",
     "ncaab": "basketball/mens-college-basketball",
+    "golf": "golf/pga",
+    "golf_lpga": "golf/lpga",
+    "golf_eur": "golf/eur",
+    "golf_champions": "golf/champions-tour",
+    "ufc": "mma/ufc",
+    "boxing": "boxing",
 }
 
 LABELS = {
@@ -42,7 +48,8 @@ LABELS = {
     "facup": "FA CUP", "libertadores": "LIBERT", "sudamericana": "SUDAM",
     "concacaf": "CONCACAF", "atp": "TENNIS", "wta": "TENNIS", "f1": "F1",
     "mlb": "MLB", "nhl": "NHL", "mls": "MLS", "nwsl": "NWSL", "wnba": "WNBA",
-    "ncaab": "NCAAB",
+    "ncaab": "NCAAB", "golf": "GOLF", "golf_lpga": "LPGA", "golf_eur": "GOLF",
+    "golf_champions": "GOLF", "ufc": "UFC", "boxing": "BOXING",
 }
 
 _CUPS = {"ucl", "uel", "facup", "libertadores", "sudamericana", "concacaf"}
@@ -187,9 +194,16 @@ def from_match(event: dict, sport: str, now=None):
     return card
 
 
-def from_tournament(event: dict, sport: str, now=None):
-    """A tennis tournament as one card. Only the majors qualify."""
-    if not event.get("major"):
+def from_tournament(event: dict, sport: str, now=None, require_major: bool = True):
+    """A tennis tournament as one card.
+
+    Majors earn a place in the tennis block on their own merit. With
+    require_major=False the minor tournaments come back too, tagged for the
+    ALSO ON slot — the ATP and WTA run something almost every week of the year,
+    which is what makes a daily oddity possible at all.
+    """
+    is_major = bool(event.get("major"))
+    if require_major and not is_major:
         return None
     start = _iso(event.get("date", ""))
     end = _iso(event.get("endDate", ""))
@@ -236,9 +250,12 @@ def from_tournament(event: dict, sport: str, now=None):
         "subtitle": tally.most_common(1)[0][0] if tally else "In progress",
         "detail": "Men's & Women's",
         "status_text": "ALL DAY",
-        "major": True,
+        "major": is_major,
         "score": None,
     })
+    if not is_major:
+        card["bucket"] = "oddity"
+        card["detail"] = "ATP / WTA"
     return card
 
 
@@ -274,3 +291,56 @@ def from_sessions(event: dict, sport: str, now=None, include_practice: bool = Fa
         })
         out.append(card)
     return out
+
+
+def from_multiday(event: dict, sport: str, now=None):
+    """A whole-event card for sports ESPN models as one multi-day happening:
+    a golf tournament, a UFC fight card, a boxing bill.
+
+    Distinct from from_tournament, which is tennis-specific and insists on a
+    major. These fill the ALSO ON slot, so they have no majorness requirement —
+    the point is that something fun is on tonight.
+    """
+    comps = event.get("competitions") or []
+    if not comps:
+        return None
+    start = _iso(event.get("date", ""))
+    if not start:
+        return None
+    end = _iso(event.get("endDate", "")) or start
+    ref = now or datetime.now(start.tzinfo)
+    day = bucket(start, now) or bucket(end, now)
+    if day is None:
+        # A tournament already under way spans the window without starting in it.
+        day = "today" if start <= ref <= end else None
+    if day is None:
+        return None
+
+    names = []
+    for c in comps:
+        names += _broadcasts(c)
+    channel = best_channel(names)
+    if channel is None:
+        return None
+
+    comp = comps[0]
+    card = _base(sport, start, day, comp, channel, _state(comp))
+    headline = ""
+    if sport in ("ufc", "boxing"):
+        # The main event is the draw, and it is in the event name after the colon.
+        headline = event.get("name", "").split(":", 1)[-1].strip()
+    else:
+        # Golf. "FINAL" read as "the tournament final"; the round is what the
+        # viewer actually wants. ESPN spells it "Round 3 - Play Complete".
+        detail = ((comp.get("status") or {}).get("type") or {}).get("shortDetail", "")
+        headline = detail.replace(" - ", " · ")[:26]
+    card.update({
+        "layout": "single",
+        "title": (event.get("shortName") or event.get("name", "")).split(":")[0].strip().upper(),
+        "subtitle": headline or _status_text(_state(comp), comp, start),
+        "detail": (event.get("venue") or {}).get("fullName", "")[:28],
+        "score": None,
+        "status_text": "ALL DAY" if _state(comp) != "in" else card["status_text"],
+        "bucket": "oddity",
+    })
+    return card

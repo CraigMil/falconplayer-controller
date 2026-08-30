@@ -37,6 +37,7 @@ _ALIASES = {
     "Paramount Plus": "Paramount+",
     "Amazon Prime Video": "Prime Video",
     "HBO Max": "Max",
+    "Golf Chnl": "Golf Channel",
 }
 
 # A bare local call sign — KOMO-TV, KING 5, KIRO. These are free over the air,

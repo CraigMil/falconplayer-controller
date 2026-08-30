@@ -13,7 +13,7 @@ from .window import PACIFIC
 
 CAPS = {
     "nfl": 3, "ncaaf": 3, "epl": 3, "cup": 2, "tennis": 2, "f1": 2,
-    "oddity": 1, "home": 4, "highlight": 3,
+    "oddity": 2, "home": 4, "highlight": 3,
 }
 
 # Tomorrow is a PREVIEW, and it needs its own budget rather than sharing
@@ -33,9 +33,20 @@ _TIER_ORDER = {"watchable": 0, "payable": 1}
 _FAR_FUTURE = datetime.max.replace(tzinfo=timezone.utc)
 
 
+_ALSO_ON = {"golf", "ufc", "boxing"}
+
+
 def _bucket_key(card: dict) -> str:
+    # An explicit override wins: minor tennis, golf, UFC and boxing all belong
+    # in the ALSO ON slot regardless of what sport they nominally are.
+    if card.get("bucket"):
+        return card["bucket"]
     if card.get("is_cup"):
         return "cup"
+    # Golf, UFC and boxing share the ALSO ON slot with the curated oddities:
+    # they are the same thing to the viewer — something fun that is on tonight.
+    if card["sport"] in _ALSO_ON:
+        return "oddity"
     if card["sport"] in ("atp", "wta"):
         return "tennis"
     return card["sport"]
@@ -155,3 +166,27 @@ def assemble(home, events, highlights, now=None):
         return [{"kind": "empty", "sport": "empty", "title": "NOTHING ON",
                  "subtitle": "", "dwell_floor": None}]
     return slides
+
+
+def guarantee_oddity(picked, pool):
+    """Make sure something fun is always on the board.
+
+    Craig wants at least one ALSO ON card every day. The pool is deep — four
+    golf tours, UFC, boxing, the curated calendar, and every minor ATP/WTA
+    tournament — but it can still come up empty on a quiet Tuesday. Rather than
+    show nothing, promote the best leftover event from a sport the board is not
+    already showing, so the slot is filled with variety rather than a fourth
+    college football game.
+    """
+    if any(_bucket_key(c) == "oddity" for c in picked):
+        return picked
+    chosen = {id(c) for c in picked}
+    shown = {c.get("sport") for c in picked}
+    leftovers = [c for c in pool if id(c) not in chosen]
+    if not leftovers:
+        return picked
+    fresh = [c for c in leftovers if c.get("sport") not in shown]
+    best = sorted(fresh or leftovers, key=rank_key)[0]
+    best = dict(best)
+    best["bucket"] = "oddity"
+    return picked + [best]

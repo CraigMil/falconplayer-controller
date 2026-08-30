@@ -53,7 +53,7 @@ def _age(published: datetime, now: datetime) -> str:
     return f"{hours}h" if hours < 48 else f"{hours // 24}d"
 
 
-def select(entries_by_source, now: datetime, patterns_by_source):
+def select(entries_by_source, now: datetime, patterns_by_source, sports_by_source=None):
     """At most one card per source, at most three overall, most recent first."""
     picks = []
     for source, entries in entries_by_source.items():
@@ -86,6 +86,7 @@ def select(entries_by_source, now: datetime, patterns_by_source):
             head, tail = raw, source
         cards.append({
             "kind": "highlight", "sport": "highlight", "source": source,
+            "sport_label": (sports_by_source or {}).get(source, "").upper() or "HIGHLIGHTS",
             # Generous: the card now shrinks text to fit across two lines, so
             # clipping here only ever loses a real competitor's name.
             "title": head.strip().upper()[:60],
@@ -104,9 +105,11 @@ def fetch_all(now=None):
     now = now or datetime.now(timezone.utc)
     entries = {}
     patterns = {}
+    sports = {}
     for source in highlight_sources():
         name = source["name"]
         patterns[name] = source.get("patterns", [])
+        sports[name] = source.get("label") or source.get("sport", "")
         try:
             with httpx.Client(timeout=10) as c:
                 r = c.get(FEED.format(source["channel_id"]))
@@ -114,4 +117,4 @@ def fetch_all(now=None):
             entries[name] = parse_feed(r.text)
         except Exception:
             entries[name] = []
-    return select(entries, now, patterns)
+    return select(entries, now, patterns, sports)

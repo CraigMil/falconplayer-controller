@@ -60,11 +60,40 @@ def test_seattle_teams_all_appear_including_the_payable_ones(offline):
 
 
 def test_caps_are_respected_across_the_whole_board(offline):
-    from fpp.displays.whatson.select import CAPS
+    """Counted by BUCKET, not by sport: a minor ATP tournament is nominally
+    tennis but deliberately occupies the ALSO ON slot, so counting by sport
+    would double-count it against the tennis cap."""
+    from fpp.displays.whatson.select import CAPS, _bucket_key
     slides, _ = whatson.build_board(now=NOW)
-    events = [s for s in slides if s["kind"] == "event" and not s.get("home_team")]
-    assert len([s for s in events if s["sport"] == "ncaaf"]) <= CAPS["ncaaf"]
-    assert len([s for s in events if s["sport"] in ("atp", "wta")]) <= CAPS["tennis"]
+    events = [s for s in slides
+              if s["kind"] == "event" and not s.get("home_team") and s["day"] == "today"]
+    for bucket in ("ncaaf", "tennis", "oddity"):
+        n = len([s for s in events if _bucket_key(s) == bucket])
+        assert n <= CAPS[bucket], f"{bucket}: {n} > {CAPS[bucket]}"
+
+
+def test_the_board_always_carries_at_least_one_also_on_card(offline):
+    """Craig wants something fun every day, without exception."""
+    from fpp.displays.whatson.select import _bucket_key
+    slides, _ = whatson.build_board(now=NOW)
+    also_on = [s for s in slides if s["kind"] == "event" and _bucket_key(s) == "oddity"]
+    assert also_on, "the ALSO ON slot must never be empty"
+
+
+def test_the_guarantee_promotes_a_leftover_when_nothing_fun_is_on(monkeypatch):
+    """With only college football in the world, the slot is still filled."""
+    from fpp.displays.whatson.select import _bucket_key
+
+    def only_ncaaf(slug, dates=None):
+        if slug == "football/college-football":
+            return json.loads((FIX / "ncaaf_20260829.json").read_text())
+        return {"events": []}
+
+    monkeypatch.setattr("fpp.displays.whatson.sources.fetch", only_ncaaf)
+    monkeypatch.setattr("fpp.displays.whatson.highlights.fetch_all", lambda now=None: [])
+    monkeypatch.setattr("fpp.displays.whatson.cards._logo", lambda url: None)
+    slides, _ = whatson.build_board(now=NOW)
+    assert [s for s in slides if s["kind"] == "event" and _bucket_key(s) == "oddity"]
 
 
 def test_no_unwatchable_event_reaches_the_board(offline):

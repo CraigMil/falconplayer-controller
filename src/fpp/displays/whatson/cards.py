@@ -124,8 +124,12 @@ def _highlight(frame: Frame, card: dict) -> Frame:
     # The QR scans reliably at 4px per module and must not shrink, so the space
     # for names is reclaimed from the header instead: a slim 14px bar rather
     # than a 22px one, and no separate subtitle line when there is a matchup.
-    frame.rect(0, 0, W, 14, (35, 35, 35))
-    frame.text(5, 7, "HIGHLIGHTS", size=9, color=DIM, anchor="lm")
+    # Name the sport: "HIGHLIGHTS" alone left the viewer guessing what they were
+    # about to scan.
+    label = card.get("sport_label") or "HIGHLIGHTS"
+    frame.rect(0, 0, W, 14, LEAGUE_COLOURS.get(label, (35, 35, 35)))
+    frame.text(5, 7, f"{label} HIGHLIGHTS" if label != "HIGHLIGHTS" else label,
+               size=9, color=FG, anchor="lm")
     frame.text(W - 5, 7, card.get("age", ""), size=9, color=DIM, anchor="rm")
 
     # 4px per module is the proven-scannable default. Smaller frees space for
@@ -136,6 +140,11 @@ def _highlight(frame: Frame, card: dict) -> Frame:
 
     title = card.get("title", "")
     parts = _VS.split(title, maxsplit=1)
+    if len(parts) == 2:
+        # "Juventus vs. Parma: Extended Highlights" — the descriptor rides along
+        # on the second name and has to come off, or the opponent reads as
+        # "PARMA: EXTENDED HIGHLIGHTS".
+        parts[1] = re.split(r"\s*[:|]\s*", parts[1], maxsplit=1)[0]
     top, bottom = 14, qr_y
     if len(parts) == 2:
         # Two competitors, one per line, with the whole band to themselves.

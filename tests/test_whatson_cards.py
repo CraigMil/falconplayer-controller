@@ -59,3 +59,14 @@ def test_highlight_card_without_a_matchup_still_renders():
                 subtitle="Race Highlights", age="2h",
                 url="https://youtu.be/dQw4w9WgXcQ", dwell_floor=15.0)
     assert render(card).to_image_bytes()[:2] == b"\xff\xd8"
+
+
+def test_highlight_strips_a_descriptor_from_the_second_competitor():
+    import re
+
+    from fpp.displays.whatson.cards import _VS
+    title = "JUVENTUS VS. PARMA: EXTENDED HIGHLIGHTS"
+    parts = _VS.split(title, maxsplit=1)
+    assert len(parts) == 2
+    opponent = re.split(r"\s*[:|]\s*", parts[1], maxsplit=1)[0]
+    assert opponent == "PARMA"
