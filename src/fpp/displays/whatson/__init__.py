@@ -1,1 +1,77 @@
-"""What's on today and tomorrow, and where to watch it."""
+"""What's on today and tomorrow, and where to watch it.
+
+Public surface is build_board(); everything else is an implementation detail of
+this package.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+from . import cards, channels, config, highlights, select, sources, window
+from .window import date_range
+
+__all__ = ["build_board", "cards", "channels", "config", "highlights",
+           "select", "sources", "window"]
+
+# Which adapter each slug needs.
+_MATCH = ["nfl", "ncaaf", "epl", "ucl", "uel", "facup", "libertadores",
+          "sudamericana", "concacaf"]
+_TOURNAMENT = ["atp", "wta"]
+_SESSION = ["f1"]
+_HOME_ONLY = ["mlb", "nhl", "mls", "nwsl", "wnba", "ncaab"]
+
+
+def build_board(now=None, include_practice: bool = False,
+                with_highlights: bool = True):
+    """The full slide list, plus a one-word reason for the log line."""
+    now = now or datetime.now(timezone.utc)
+    dates = date_range(now)
+
+    def _events(slug_key: str):
+        slug = sources.SLUGS[slug_key]
+        try:
+            payload = sources.fetch(slug, dates)
+        except Exception:
+            return []
+        return payload.get("events", []) or []
+
+    collected = []
+
+    for key in _MATCH + _HOME_ONLY:
+        for event in _events(key):
+            card = sources.from_match(event, key, now)
+            if card:
+                collected.append(card)
+
+    for key in _TOURNAMENT:
+        for event in _events(key):
+            card = sources.from_tournament(event, key, now)
+            if card:
+                collected.append(card)
+
+    for key in _SESSION:
+        for event in _events(key):
+            collected += sources.from_sessions(event, key, now, include_practice)
+
+    collected = select.mark_home(collected)
+    collected += select.oddity_cards(now)
+
+    home = [c for c in collected if c.get("home_team")]
+    # Home-only leagues exist to find the user's teams; every other game in them
+    # is discarded rather than competing for a slot.
+    rest = [c for c in collected
+            if not c.get("home_team") and c["sport"] not in _HOME_ONLY]
+
+    # Payable events must be major to earn a slot. Home teams are exempt — they
+    # were already separated out above.
+    rest = [c for c in rest if c["tier"] == "watchable" or c.get("major")]
+
+    picked = select.apply_caps(rest)
+    hl = highlights.fetch_all(now) if with_highlights else []
+    slides = select.assemble(home, picked, hl, now)
+
+    if len(slides) == 1 and slides[0]["kind"] == "empty":
+        return slides, "empty"
+    reason = "live" if any(s.get("state") == "live" for s in slides) else "scheduled"
+    return slides, reason
