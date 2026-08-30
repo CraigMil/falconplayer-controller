@@ -25,6 +25,9 @@ SLUG_FIXTURES = {
     "soccer/usa.1": "mls_20260829",
     "soccer/usa.nwsl": "nwsl_20260829",
     "basketball/wnba": "wnba_20260829",
+    "golf/pga": "golf_pga",
+    "mma/ufc": "ufc",
+    "boxing": "boxing_empty",
 }
 
 
@@ -80,8 +83,14 @@ def test_the_board_always_carries_at_least_one_also_on_card(offline):
     assert also_on, "the ALSO ON slot must never be empty"
 
 
-def test_the_guarantee_promotes_a_leftover_when_nothing_fun_is_on(monkeypatch):
-    """With only college football in the world, the slot is still filled."""
+def test_no_fake_oddity_when_only_one_sport_is_on(monkeypatch):
+    """With only college football in the world there is nothing fun to show.
+
+    The board would rather carry no ALSO ON card than relabel a fourth college
+    football game as one — that reads as more of the same. The real defence
+    against an empty slot is the breadth of the pool (four golf tours, UFC,
+    boxing, every minor ATP/WTA event), not a fake.
+    """
     from fpp.displays.whatson.select import _bucket_key
 
     def only_ncaaf(slug, dates=None):
@@ -93,7 +102,9 @@ def test_the_guarantee_promotes_a_leftover_when_nothing_fun_is_on(monkeypatch):
     monkeypatch.setattr("fpp.displays.whatson.highlights.fetch_all", lambda now=None: [])
     monkeypatch.setattr("fpp.displays.whatson.cards._logo", lambda url: None)
     slides, _ = whatson.build_board(now=NOW)
-    assert [s for s in slides if s["kind"] == "event" and _bucket_key(s) == "oddity"]
+    odd = [s for s in slides if s["kind"] == "event" and _bucket_key(s) == "oddity"]
+    assert odd == []
+    assert [s for s in slides if s["kind"] == "event"], "the rest of the board still builds"
 
 
 def test_no_unwatchable_event_reaches_the_board(offline):

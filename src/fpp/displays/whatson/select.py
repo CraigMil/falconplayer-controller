@@ -201,11 +201,14 @@ def guarantee_oddity(picked, pool):
         return picked
     chosen = {id(c) for c in picked}
     shown = {c.get("sport") for c in picked}
-    leftovers = [c for c in pool if id(c) not in chosen]
-    if not leftovers:
+    # Only a sport the board is NOT already showing. Promoting a leftover from
+    # a league already on the board just relabels a fourth Premier League game
+    # as "the oddity" — it reads as more of the same, which is the opposite of
+    # the point. Better to show no ALSO ON card than a fake one.
+    fresh = [c for c in pool
+             if id(c) not in chosen and c.get("sport") not in shown]
+    if not fresh:
         return picked
-    fresh = [c for c in leftovers if c.get("sport") not in shown]
-    best = sorted(fresh or leftovers, key=rank_key)[0]
-    best = dict(best)
+    best = dict(sorted(fresh, key=rank_key)[0])
     best["bucket"] = "oddity"
     return picked + [best]

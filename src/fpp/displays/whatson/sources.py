@@ -7,12 +7,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import httpx
 
 from .channels import best_channel
-from .window import bucket, clock
+from .window import PACIFIC, bucket, clock
+
+# ESPN stamps multi-day events on Eastern midnight boundaries.
+EASTERN = ZoneInfo("America/New_York")
 
 ESPN = "https://site.api.espn.com/apis/site/v2/sports"
 
@@ -39,6 +43,7 @@ SLUGS = {
     "golf_lpga": "golf/lpga",
     "golf_eur": "golf/eur",
     "golf_champions": "golf/champions-tour",
+    "lacrosse": "lacrosse/pll",
     "ufc": "mma/ufc",
     "boxing": "boxing",
 }
@@ -50,6 +55,7 @@ LABELS = {
     "mlb": "MLB", "nhl": "NHL", "mls": "MLS", "nwsl": "NWSL", "wnba": "WNBA",
     "ncaab": "NCAAB", "golf": "GOLF", "golf_lpga": "LPGA", "golf_eur": "GOLF",
     "golf_champions": "GOLF", "ufc": "UFC", "boxing": "BOXING",
+    "lacrosse": "LACROSSE",
 }
 
 _CUPS = {"ucl", "uel", "facup", "libertadores", "sudamericana", "concacaf"}
@@ -308,12 +314,21 @@ def from_multiday(event: dict, sport: str, now=None):
     if not start:
         return None
     end = _iso(event.get("endDate", "")) or start
-    ref = now or datetime.now(start.tzinfo)
-    day = bucket(start, now) or bucket(end, now)
-    if day is None:
-        # A tournament already under way spans the window without starting in it.
-        day = "today" if start <= ref <= end else None
-    if day is None:
+    # Compare CALENDAR DATES in ESPN's own timezone, not instants.
+    #
+    # ESPN dates these on Eastern boundaries: the Ally Challenge came back with
+    # end=2026-08-30T04:00Z, which is Aug 30 00:00 ET — the START of the final
+    # day. Measured as an instant in Pacific that is Aug 29 21:00, i.e.
+    # yesterday, and four live tournaments were dropped on Sunday final-round
+    # day. Comparing dates makes the span inclusive of its last day either way.
+    ref = (now or datetime.now(timezone.utc)).astimezone(PACIFIC).date()
+    span_start = start.astimezone(EASTERN).date()
+    span_end = end.astimezone(EASTERN).date()
+    if span_start <= ref <= span_end:
+        day = "today"
+    elif span_start == ref + timedelta(days=1):
+        day = "tomorrow"
+    else:
         return None
 
     names = []

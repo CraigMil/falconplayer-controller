@@ -7,6 +7,7 @@ from fpp.displays.whatson.select import (
     TOMORROW_CAPS,
     apply_caps,
     assemble,
+    guarantee_oddity,
     mark_home,
     oddity_cards,
     rank_key,
@@ -156,3 +157,20 @@ def test_a_live_home_game_keeps_its_live_indicator():
     slides = assemble([live], [], [], NOW)
     home = [s for s in slides if s.get("home_team")][0]
     assert home["status_text"] == "LIVE 3rd"
+
+
+def test_the_guarantee_will_not_pass_off_more_of_the_same_as_an_oddity():
+    """Promoting a leftover from a league already on the board just relabels a
+    fourth Premier League game — it reads as more of the same."""
+    picked = [card(sport="epl") for _ in range(3)]
+    pool = picked + [card(sport="epl") for _ in range(2)]
+    assert guarantee_oddity(picked, pool) == picked
+
+
+def test_the_guarantee_promotes_a_genuinely_different_sport():
+    picked = [card(sport="epl") for _ in range(3)]
+    odd = card(sport="golf")
+    result = guarantee_oddity(picked, picked + [odd])
+    assert len(result) == len(picked) + 1
+    assert result[-1]["sport"] == "golf"
+    assert result[-1]["bucket"] == "oddity"
