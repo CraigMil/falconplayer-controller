@@ -16,6 +16,16 @@ CAPS = {
     "oddity": 1, "home": 4, "highlight": 3,
 }
 
+# Tomorrow is a PREVIEW, and it needs its own budget rather than sharing
+# today's. Caps used to apply across the whole window, and because rank_key
+# sorts today ahead of tomorrow, today consumed every slot of every sport —
+# the TOMORROW block was empty on any day busy enough to fill a cap.
+# Smaller than CAPS on purpose: tomorrow is "what is coming", not a second board.
+TOMORROW_CAPS = {
+    "nfl": 1, "ncaaf": 1, "epl": 2, "cup": 1, "tennis": 1, "f1": 1,
+    "oddity": 0,
+}
+
 _DAY_ORDER = {"today": 0, "tomorrow": 1}
 _STATE_ORDER = {"live": 0, "pre": 1, "post": 2}
 _TIER_ORDER = {"watchable": 0, "payable": 1}
@@ -46,17 +56,22 @@ def rank_key(card: dict):
 
 
 def apply_caps(cards):
-    """Keep the best N of each sport. Home games are exempt — see mark_home."""
+    """Keep the best N of each sport, PER DAY. Home games are exempt — see mark_home."""
     kept = []
     used = {}
     for card in sorted(cards, key=rank_key):
         if card.get("home_team"):
             continue
         key = _bucket_key(card)
-        cap = CAPS.get(key, 2)
-        if used.get(key, 0) >= cap:
+        day = card.get("day", "today")
+        if day == "tomorrow":
+            cap = TOMORROW_CAPS.get(key, 1)
+        else:
+            cap = CAPS.get(key, 2)
+        slot = (day, key)
+        if used.get(slot, 0) >= cap:
             continue
-        used[key] = used.get(key, 0) + 1
+        used[slot] = used.get(slot, 0) + 1
         kept.append(card)
     return kept
 

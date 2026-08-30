@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from fpp.displays.whatson.select import (
     CAPS,
+    TOMORROW_CAPS,
     apply_caps,
     assemble,
     mark_home,
@@ -112,3 +113,24 @@ def test_mark_home_flags_configured_teams_only():
     marked = mark_home([seattle, other])
     assert marked[0]["home_team"] is True
     assert marked[1]["home_team"] is False
+
+
+def test_tomorrow_gets_its_own_slots_rather_than_today_taking_them_all():
+    """Regression: caps used to apply across the whole window.
+
+    rank_key sorts today ahead of tomorrow, so today consumed every slot of
+    every sport and the TOMORROW block was empty on any busy day — the board
+    ran for a day showing only today.
+    """
+    today = [card(sport="epl", day="today") for _ in range(5)]
+    tomorrow = [card(sport="epl", day="tomorrow") for _ in range(4)]
+    kept = apply_caps(today + tomorrow)
+    assert [c for c in kept if c["day"] == "tomorrow"], "tomorrow must not be starved"
+    assert len([c for c in kept if c["day"] == "today"]) == CAPS["epl"]
+
+
+def test_tomorrow_is_a_preview_not_a_second_full_board():
+    tomorrow = [card(sport="ncaaf", day="tomorrow") for _ in range(20)]
+    kept = apply_caps(tomorrow)
+    assert len(kept) == TOMORROW_CAPS["ncaaf"]
+    assert TOMORROW_CAPS["ncaaf"] < CAPS["ncaaf"]
