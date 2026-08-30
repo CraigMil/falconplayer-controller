@@ -28,6 +28,10 @@ LEAGUE_COLOURS = {
     "F1": (120, 20, 20), "MLB": (25, 45, 80), "MLS": (20, 60, 70),
     "NWSL": (70, 25, 70), "WNBA": (60, 30, 80), "NHL": (35, 35, 40),
     "ALSO ON": (50, 45, 20), "FA CUP": (40, 40, 55),
+    # The wildcard sports. They head the card as ODDITY, but the colour still
+    # follows the sport so two oddities on one board look different.
+    "GOLF": (25, 65, 35), "LPGA": (60, 30, 60), "UFC": (95, 20, 20),
+    "BOXING": (95, 45, 15), "LACROSSE": (30, 55, 75),
 }
 
 

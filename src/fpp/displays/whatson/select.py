@@ -154,11 +154,28 @@ def _day_subtitle(day: str, now=None) -> str:
     return when.strftime("%a · %b %-d").upper()
 
 
+def _mark_oddities(cards):
+    """Head the wildcard cards with ODDITY.
+
+    Whatever the slot is filled by — a golf tour, a UFC card, a minor ATP
+    tournament, an entry from the curated calendar — it is the same thing to
+    the viewer: the one fun wildcard on the board. The sport still sets the
+    colour, and the card body still names the event.
+    """
+    for c in cards:
+        if c.get("kind") == "event" and _bucket_key(c) == "oddity":
+            c.setdefault("colour_key", c.get("league_label", ""))
+            c["league_label"] = "ODDITY"
+    return cards
+
+
 def assemble(home, events, highlights, now=None):
     """The full slide list: MY TEAMS, TODAY, TOMORROW, AVAILABLE TO WATCH."""
     home = sorted(home, key=rank_key)[: CAPS["home"]]
     seen = {id(c) for c in home}
     events = [c for c in events if id(c) not in seen and not c.get("home_team")]
+
+    _mark_oddities(events)
 
     slides = []
     if home:

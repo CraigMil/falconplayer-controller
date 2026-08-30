@@ -174,3 +174,17 @@ def test_the_guarantee_promotes_a_genuinely_different_sport():
     assert len(result) == len(picked) + 1
     assert result[-1]["sport"] == "golf"
     assert result[-1]["bucket"] == "oddity"
+
+
+def test_oddity_cards_are_labelled_so_the_wildcard_is_obvious():
+    golf = card(sport="golf", league_label="GOLF", layout="single")
+    golf["bucket"] = "oddity"
+    slides = assemble([], [golf], [], NOW)
+    odd = [s for s in slides if s.get("kind") == "event"][0]
+    assert odd["league_label"] == "ODDITY"
+    assert odd["colour_key"] == "GOLF", "the sport still sets the colour"
+
+
+def test_ordinary_cards_keep_their_league_label():
+    slides = assemble([], [card(sport="epl", league_label="EPL")], [], NOW)
+    assert [s for s in slides if s.get("kind") == "event"][0]["league_label"] == "EPL"
