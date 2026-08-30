@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from fpp.displays.whatson.highlights import (
+    competition_label,
     matches,
     parse_feed,
     select,
@@ -135,3 +136,50 @@ def test_non_tennis_cards_keep_the_plain_sport_label():
     card = select({"Formula 1": [entry]}, NOW, {"Formula 1": PATTERNS},
                   {"Formula 1": "F1"})[0]
     assert card["sport_label"] == "F1"
+
+
+@pytest.mark.parametrize("title", [
+    "Juventus vs. Parma: Extended Highlights | Serie A | CBS Sports Golazo",
+    "Elversberg v. Bayer Leverkusen | BUNDESLIGA HIGHLIGHTS | NBC Sports",
+    "Real Madrid vs Girona | La Liga Highlights",
+])
+def test_leagues_craig_does_not_watch_are_denied(title):
+    """Real titles from the live feeds — these channels are multi-competition."""
+    assert not matches({"title": title}, ["Highlights", "Champions League"])
+
+
+def test_the_competitions_he_does_watch_still_match():
+    assert matches({"title": "Arsenal vs Bayern | Champions League Highlights"},
+                   ["Champions League"])
+    assert matches({"title": "Spurs vs Newcastle | Premier League Highlights"},
+                   ["Premier League"])
+
+
+@pytest.mark.parametrize("title,expected", [
+    ("Arsenal vs Bayern: Extended Highlights | UEFA Champions League", "UCL"),
+    ("Spurs vs Newcastle | Premier League Update | NBC Sports", "EPL"),
+    ("Roma vs Rangers | Europa League Highlights", "UEL"),
+    ("Flamengo vs River | Copa Libertadores Highlights", "LIBERTADORES"),
+    ("Some match with no competition named", None),
+])
+def test_competition_label_from_soccer_titles(title, expected):
+    assert competition_label(title) == expected
+
+
+def test_soccer_cards_say_the_competition_not_soccer():
+    entry = {"title": "Arsenal vs Bayern: Extended Highlights | UEFA Champions League",
+             "video_id": "s", "published": NOW - timedelta(hours=1)}
+    card = select({"CBS Sports Golazo": [entry]}, NOW,
+                  {"CBS Sports Golazo": ["Champions League"]},
+                  {"CBS Sports Golazo": "SOCCER"})[0]
+    assert card["sport_label"] == "UCL"
+    assert card["colour_key"] == "UCL"
+
+
+def test_soccer_falls_back_when_no_competition_is_named():
+    entry = {"title": "Great goals compilation | Highlights", "video_id": "t",
+             "published": NOW - timedelta(hours=1)}
+    card = select({"CBS Sports Golazo": [entry]}, NOW,
+                  {"CBS Sports Golazo": ["Highlights"]},
+                  {"CBS Sports Golazo": "SOCCER"})[0]
+    assert card["sport_label"] == "SOCCER"

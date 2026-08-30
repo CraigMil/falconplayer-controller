@@ -396,7 +396,12 @@ def tennis_matches(event: dict, sport: str, now=None, limit: int = 4):
         best_seed = min(seeds) if seeds else 99
         rnd = str((comp.get("round") or {}).get("displayName", ""))
         sets_played = max((len(p["sets"]) for p in players), default=0)
+        tourn = (event.get("shortName") or event.get("name", "")).upper()
         card.update({
+            # The strip names the TOURNAMENT — "US OPEN" tells you far more
+            # than "TENNIS" when four tennis cards are on the board.
+            "league_label": tourn[:14],
+            "colour_key": "TENNIS",
             "layout": "tennis",
             "players": players,
             "title": " v ".join(p["name"] for p in players),

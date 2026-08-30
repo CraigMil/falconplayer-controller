@@ -52,8 +52,18 @@
   label: EPL
   channel_id: UCqZQlzSHbVJrwrn5XvzrzcA
   patterns: ["Premier League"]
+# Golazo is MULTI-COMPETITION and names the competition in the title
+# ("Juventus vs. Parma: Extended Highlights | Serie A | CBS Sports Golazo"),
+# so match on the competitions Craig actually watches rather than on
+# "Highlights", which swept up Serie A.
 - name: CBS Sports Golazo
   sport: cup
   label: SOCCER
   channel_id: UCET00YnetHT7tOpu12v8jxg
-  patterns: ["Highlights", "Extended Highlights"]
+  patterns:
+    - "Champions League"
+    - "Europa League"
+    - "Conference League"
+    - "Copa Libertadores"
+    - "Sudamericana"
+    - "Concacaf"

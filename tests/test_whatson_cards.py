@@ -28,7 +28,7 @@ def base(**kw):
     base(layout="single", title="US OPEN", subtitle="Round of 16", detail="Men's & Women's"),
     base(layout="single", title="ITALIAN GP", subtitle="RACE", detail="Monza", channel="Apple TV"),
     dict(kind="divider", title="TODAY", subtitle="SAT · AUG 29", count=6, sport="divider"),
-    dict(kind="divider", title="SEATTLE", subtitle="", count=3, sport="divider"),
+    dict(kind="divider", title="MY TEAMS", subtitle="", count=3, sport="divider"),
     dict(kind="empty", title="NOTHING ON", subtitle="next: EPL Sat 4:30a", sport="empty"),
 ])
 def test_every_card_kind_renders_to_a_192_square(card):
@@ -70,3 +70,16 @@ def test_highlight_strips_a_descriptor_from_the_second_competitor():
     assert len(parts) == 2
     opponent = re.split(r"\s*[:|]\s*", parts[1], maxsplit=1)[0]
     assert opponent == "PARMA"
+
+
+def test_a_long_headline_wraps_instead_of_overflowing():
+    from fpp.displays.whatson.cards import _wrap
+    rows = _wrap("NEWCASTLE UPEND SPURS; HULL CITY STUN COVENTRY CITY", 2)
+    assert len(rows) == 2
+    assert all(len(r) < 34 for r in rows), rows
+    assert " ".join(rows) == "NEWCASTLE UPEND SPURS; HULL CITY STUN COVENTRY CITY"
+
+
+def test_a_short_headline_stays_on_one_line():
+    from fpp.displays.whatson.cards import _wrap
+    assert _wrap("ITALIAN GP", 2) == ["ITALIAN GP"]

@@ -45,8 +45,12 @@ def _logo(url: str):
 
 def _strip(frame: Frame, card: dict) -> None:
     label = card.get("league_label", "")
-    frame.rect(0, 0, W, STRIP_H, LEAGUE_COLOURS.get(label, (40, 40, 40)))
-    frame.text(6, STRIP_H // 2, label, size=13, color=FG, anchor="lm")
+    # colour_key lets a card show one thing and be coloured as another — a
+    # tennis card says "US OPEN" but keeps the tennis green.
+    frame.rect(0, 0, W, STRIP_H,
+               LEAGUE_COLOURS.get(card.get("colour_key") or label, (40, 40, 40)))
+    frame.text_fit(6, STRIP_H // 2, label, max_width=124, size=13, min_size=8,
+                   color=FG, anchor="lm")
     colour = LIVE if card.get("state") == "live" else FG
     frame.text(W - 6, STRIP_H // 2, card.get("status_text", ""), size=12,
                color=colour, anchor="rm")
@@ -93,8 +97,10 @@ def _tennis(frame: Frame, card: dict) -> None:
         flag = _logo(p.get("flag", ""))
         x_text = 8
         if flag is not None:
-            frame.paste(flag.resize((20, 14)), 6, y + 2)
-            x_text = 32
+            # 28x19 rather than 20x14 — at 192px a small flag is unreadable
+            # from across the room, and the flag is half the identification.
+            frame.paste(flag.resize((28, 19)), 6, y)
+            x_text = 40
         label = p.get("name", "")
         if p.get("seed"):
             label = f"({p['seed']}) {label}"
@@ -145,6 +151,31 @@ def _empty(frame: Frame, card: dict) -> Frame:
 _VS = re.compile(r"\s+(?:vs\.?|v\.?|versus)\s+", re.I)
 
 
+def _wrap(text: str, lines: int = 2):
+    """Split into at most `lines` balanced word-lines.
+
+    text_fit shrinks to a floor and then simply overflows, so a long headline
+    like "Newcastle upend Spurs; Hull City stun Coventry City" ran off both
+    edges of the panel. Wrapping is the only thing that actually fits it.
+    """
+    words = text.split()
+    if not words:
+        return [""]
+    if len(text) <= 18:            # "ITALIAN GP" belongs on one line
+        return [text]
+    target = max(1, len(text) // lines)
+    out, cur = [], ""
+    for word in words:
+        candidate = f"{cur} {word}".strip()
+        if cur and len(candidate) > target and len(out) < lines - 1:
+            out.append(cur)
+            cur = word
+        else:
+            cur = candidate
+    out.append(cur)
+    return out[:lines]
+
+
 def _highlight(frame: Frame, card: dict) -> Frame:
     from .qr import qr_image
 
@@ -159,8 +190,8 @@ def _highlight(frame: Frame, card: dict) -> Frame:
     colour = LEAGUE_COLOURS.get(card.get("colour_key") or label, (35, 35, 35))
     frame.rect(0, 0, W, 14, colour)
     text = f"{label} HIGHLIGHTS" if label != "HIGHLIGHTS" else label
-    frame.text_fit(5 + 66, 7, text, max_width=132, size=9, min_size=7,
-                   color=FG, anchor="mm")
+    frame.text_fit(5, 7, text, max_width=132, size=9, min_size=7,
+                   color=FG, anchor="lm")
     frame.text(W - 5, 7, card.get("age", ""), size=9, color=DIM, anchor="rm")
 
     # 4px per module is the proven-scannable default. Smaller frees space for
@@ -186,10 +217,18 @@ def _highlight(frame: Frame, card: dict) -> Frame:
         frame.text_fit(W // 2, top + (bottom - top) * 0.80, parts[1].strip(),
                        max_width=W - 8, size=15, min_size=8, color=FG, anchor="mm")
     else:
-        frame.text_fit(W // 2, top + (bottom - top) * 0.35, title,
-                       max_width=W - 8, size=16, min_size=8, color=FG, anchor="mm")
-        frame.text_fit(W // 2, top + (bottom - top) * 0.75, card.get("subtitle", ""),
-                       max_width=W - 8, size=12, min_size=7, color=DIM, anchor="mm")
+        rows = _wrap(title, 2)
+        if len(rows) == 1:
+            frame.text_fit(W // 2, top + (bottom - top) * 0.35, rows[0],
+                           max_width=W - 8, size=16, min_size=8, color=FG, anchor="mm")
+            frame.text_fit(W // 2, top + (bottom - top) * 0.75, card.get("subtitle", ""),
+                           max_width=W - 8, size=12, min_size=7, color=DIM, anchor="mm")
+        else:
+            # A wrapped headline takes the whole band; the subtitle would only
+            # squeeze it further, and it says less.
+            for n, row in enumerate(rows):
+                frame.text_fit(W // 2, top + (bottom - top) * (0.30 + 0.40 * n), row,
+                               max_width=W - 8, size=14, min_size=7, color=FG, anchor="mm")
     return frame
 
 

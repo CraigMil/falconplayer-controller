@@ -46,7 +46,7 @@ def test_board_builds_and_starts_with_the_seattle_block(offline):
     slides, _ = whatson.build_board(now=NOW)
     assert slides
     assert slides[0]["kind"] == "divider"
-    assert slides[0]["title"] == "SEATTLE"
+    assert slides[0]["title"] == "MY TEAMS"
 
 
 def test_seattle_teams_all_appear_including_the_payable_ones(offline):

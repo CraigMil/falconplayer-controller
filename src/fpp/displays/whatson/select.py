@@ -30,6 +30,16 @@ _DAY_ORDER = {"today": 0, "tomorrow": 1}
 _STATE_ORDER = {"live": 0, "pre": 1, "post": 2}
 _TIER_ORDER = {"watchable": 0, "payable": 1}
 
+# Craig's order of interest. Only affects the ORDER cards appear in within a
+# day — the per-sport caps decide which ones get in at all.
+COMPETITION_RANK = {
+    "epl": 0, "ucl": 1, "facup": 2, "uel": 3,
+    "nfl": 4, "ncaaf": 5,
+    "atp": 6, "wta": 6, "f1": 7,
+    "libertadores": 8, "sudamericana": 9, "concacaf": 10,
+    "oddity": 20,
+}
+
 _FAR_FUTURE = datetime.max.replace(tzinfo=timezone.utc)
 
 
@@ -59,6 +69,7 @@ def rank_key(card: dict):
         _DAY_ORDER.get(card.get("day"), 9),
         _STATE_ORDER.get(card.get("state"), 9),
         -card.get("drama", 0),
+        COMPETITION_RANK.get(card.get("sport"), 15),
         -card.get("round_weight", 0),
         rank if isinstance(rank, int) else 99,
         _TIER_ORDER.get(card.get("tier"), 9),
@@ -144,14 +155,14 @@ def _day_subtitle(day: str, now=None) -> str:
 
 
 def assemble(home, events, highlights, now=None):
-    """The full slide list: SEATTLE, TODAY, TOMORROW, AVAILABLE TO WATCH."""
+    """The full slide list: MY TEAMS, TODAY, TOMORROW, AVAILABLE TO WATCH."""
     home = sorted(home, key=rank_key)[: CAPS["home"]]
     seen = {id(c) for c in home}
     events = [c for c in events if id(c) not in seen and not c.get("home_team")]
 
     slides = []
     if home:
-        slides.append(divider("SEATTLE", len(home)))
+        slides.append(divider("MY TEAMS", len(home)))
         slides += home
     for day in ("today", "tomorrow"):
         block = [c for c in events if c.get("day") == day]

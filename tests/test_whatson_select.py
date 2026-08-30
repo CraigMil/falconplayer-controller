@@ -64,7 +64,7 @@ def test_home_games_bypass_caps_and_leave_the_day_blocks():
     others = [card(sport="ncaaf") for _ in range(10)]
     slides = assemble(home, apply_caps(others), [], NOW)
     assert slides[0]["kind"] == "divider"
-    assert slides[0]["title"] == "SEATTLE"
+    assert slides[0]["title"] == "MY TEAMS"
     assert sum(1 for s in slides if s.get("home_team")) == 2
 
 
@@ -73,7 +73,7 @@ def test_assemble_orders_the_blocks_and_inserts_dividers():
                       [card(day="today"), card(day="tomorrow")],
                       [dict(kind="highlight", title="X", dwell_floor=15.0)], NOW)
     titles = [s["title"] for s in slides if s["kind"] == "divider"]
-    assert titles == ["SEATTLE", "TODAY", "TOMORROW", "AVAILABLE TO WATCH"]
+    assert titles == ["MY TEAMS", "TODAY", "TOMORROW", "AVAILABLE TO WATCH"]
 
 
 def test_empty_everything_yields_a_single_empty_card():

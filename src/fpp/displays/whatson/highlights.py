@@ -73,9 +73,68 @@ def tournament_label(title: str):
     return seg.upper() or None
 
 
+# Competitions Craig does not follow. These channels are multi-competition —
+# CBS Golazo posts Serie A alongside the Champions League, NBC posts the
+# Bundesliga alongside the Premier League — and they name the competition right
+# there in the title, so it can be filtered honestly.
+DENY = (
+    "serie a", "la liga", "laliga", "bundesliga", "ligue 1", "eredivisie",
+    "liga mx", "primeira liga", "saudi pro league", "brasileir",
+)
+
+
+# Soccer channels name the competition in the title, so a card can say
+# "UCL HIGHLIGHTS" rather than the uselessly generic "SOCCER HIGHLIGHTS".
+COMPETITIONS = (
+    ("champions league", "UCL"),
+    ("europa league", "UEL"),
+    ("conference league", "UECL"),
+    ("premier league", "EPL"),
+    ("fa cup", "FA CUP"),
+    ("carabao", "CARABAO"),
+    ("copa libertadores", "LIBERTADORES"),
+    ("libertadores", "LIBERTADORES"),
+    ("sudamericana", "SUDAMERICANA"),
+    ("concacaf", "CONCACAF"),
+    ("world cup", "WORLD CUP"),
+)
+
+
+def competition_label(title: str):
+    """The competition named in a soccer highlight title, or None."""
+    low = (title or "").lower()
+    for needle, label in COMPETITIONS:
+        if needle in low:
+            return label
+    return None
+
+
 def matches(entry: dict, patterns) -> bool:
     title = (entry.get("title") or "").lower()
+    if any(d in title for d in DENY):
+        return False
     return any(p.lower() in title for p in patterns)
+
+
+_SOCCER_LABELS = {"SOCCER", "EPL"}
+
+
+def _display_label(title: str, base_label: str) -> str:
+    """What the card's header says. Tennis names the tournament, soccer names
+    the competition; everything else keeps its sport."""
+    if base_label == "TENNIS":
+        return tournament_label(title) or base_label
+    if base_label in _SOCCER_LABELS:
+        return competition_label(title) or base_label
+    return base_label
+
+
+def _colour_key(title: str, base_label: str) -> str:
+    """Colour follows the competition where the palette knows it, so a UCL card
+    is UCL blue rather than a generic grey."""
+    if base_label in _SOCCER_LABELS:
+        return competition_label(title) or base_label
+    return base_label
 
 
 def _age(published: datetime, now: datetime) -> str:
@@ -120,9 +179,8 @@ def select(entries_by_source, now: datetime, patterns_by_source, sports_by_sourc
             # Tennis names the tournament rather than the sport — "US OPEN
             # HIGHLIGHTS" beats "TENNIS HIGHLIGHTS" when the tournament is
             # right there in the title.
-            "sport_label": (tournament_label(raw) if base_label == "TENNIS" else None)
-                           or base_label,
-            "colour_key": base_label,
+            "sport_label": _display_label(raw, base_label),
+            "colour_key": _colour_key(raw, base_label),
             # Generous: the card now shrinks text to fit across two lines, so
             # clipping here only ever loses a real competitor's name.
             "title": head.strip().upper()[:60],

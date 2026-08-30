@@ -1,5 +1,8 @@
 # Always shown when they play, whatever the sport, channel or caps.
 # Match is on the ESPN competitor displayName, so use the full club name.
+#
+# Not only Seattle: Arsenal is here too, which is why the block on the panel
+# reads MY TEAMS rather than SEATTLE.
 - { slug: football/nfl,                        team: Seattle Seahawks }
 - { slug: baseball/mlb,                        team: Seattle Mariners }
 - { slug: hockey/nhl,                          team: Seattle Kraken }
@@ -8,3 +11,6 @@
 - { slug: basketball/wnba,                     team: Seattle Storm }
 - { slug: football/college-football,           team: Washington Huskies }
 - { slug: basketball/mens-college-basketball,  team: Washington Huskies }
+- { slug: soccer/eng.1,                        team: Arsenal }
+- { slug: soccer/uefa.champions,               team: Arsenal }
+- { slug: soccer/eng.fa,                       team: Arsenal }
