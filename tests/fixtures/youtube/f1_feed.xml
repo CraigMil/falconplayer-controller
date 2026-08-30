@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom">
+ <link rel="self" href="http://www.youtube.com/feeds/videos.xml?channel_id=UCB_qr75-ydFVKSF9Dmo6izg"/>
+ <id>yt:channel:B_qr75-ydFVKSF9Dmo6izg</id>
+ <yt:channelId>B_qr75-ydFVKSF9Dmo6izg</yt:channelId>
+ <title>FORMULA 1</title>
+ <link rel="alternate" href="https://www.youtube.com/channel/UCB_qr75-ydFVKSF9Dmo6izg"/>
+ <author>
+  <name>FORMULA 1</name>
+  <uri>https://www.youtube.com/channel/UCB_qr75-ydFVKSF9Dmo6izg</uri>
+ </author>
+ <published>2005-12-29T00:34:38+00:00</published>
+ <entry>
+ <id>yt:video:raceVID0001</id>
+ <yt:videoId>raceVID0001</yt:videoId>
+ <yt:channelId>UCB_qr75-ydFVKSF9Dmo6izg</yt:channelId>
+ <title>Italian GP | Race Highlights</title>
+ <link rel="alternate" href="https://www.youtube.com/watch?v=raceVID0001"/>
+ <author><name>FORMULA 1</name></author>
+ <published>2026-08-29T12:00:00+00:00</published>
+ <updated>2026-08-29T12:00:00+00:00</updated>
+</entry>
+<entry>
+ <id>yt:video:qualVID0001</id>
+ <yt:videoId>qualVID0001</yt:videoId>
+ <yt:channelId>UCB_qr75-ydFVKSF9Dmo6izg</yt:channelId>
+ <title>Italian GP | Qualifying Highlights</title>
+ <link rel="alternate" href="https://www.youtube.com/watch?v=qualVID0001"/>
+ <author><name>FORMULA 1</name></author>
+ <published>2026-08-28T18:00:00+00:00</published>
+ <updated>2026-08-28T18:00:00+00:00</updated>
+</entry>
+<entry>
+ <id>yt:video:sprtVID0001</id>
+ <yt:videoId>sprtVID0001</yt:videoId>
+ <yt:channelId>UCB_qr75-ydFVKSF9Dmo6izg</yt:channelId>
+ <title>Italian GP | Sprint Highlights</title>
+ <link rel="alternate" href="https://www.youtube.com/watch?v=sprtVID0001"/>
+ <author><name>FORMULA 1</name></author>
+ <published>2026-08-28T08:00:00+00:00</published>
+ <updated>2026-08-28T08:00:00+00:00</updated>
+</entry>
+<entry>
+ <id>yt:video:fillVID0001</id>
+ <yt:videoId>fillVID0001</yt:videoId>
+ <yt:channelId>UCB_qr75-ydFVKSF9Dmo6izg</yt:channelId>
+ <title>Lando Norris Ranks His Best F1 Moments! ↕️🙌</title>
+ <link rel="alternate" href="https://www.youtube.com/watch?v=fillVID0001"/>
+ <author><name>FORMULA 1</name></author>
+ <published>2026-08-29T09:00:00+00:00</published>
+ <updated>2026-08-29T09:00:00+00:00</updated>
+</entry>
+<entry>
+ <id>yt:video:fillVID0002</id>
+ <yt:videoId>fillVID0002</yt:videoId>
+ <yt:channelId>UCB_qr75-ydFVKSF9Dmo6izg</yt:channelId>
+ <title>Can Valtteri &amp; Sergio Complete These Challenges?! | F1 Grid Games</title>
+ <link rel="alternate" href="https://www.youtube.com/watch?v=fillVID0002"/>
+ <author><name>FORMULA 1</name></author>
+ <published>2026-08-29T07:00:00+00:00</published>
+ <updated>2026-08-29T07:00:00+00:00</updated>
+</entry>
+<entry>
+ <id>yt:video:staleVID001</id>
+ <yt:videoId>staleVID001</yt:videoId>
+ <yt:channelId>UCB_qr75-ydFVKSF9Dmo6izg</yt:channelId>
+ <title>Belgian GP | Race Highlights</title>
+ <link rel="alternate" href="https://www.youtube.com/watch?v=staleVID001"/>
+ <author><name>FORMULA 1</name></author>
+ <published>2026-08-20T12:00:00+00:00</published>
+ <updated>2026-08-20T12:00:00+00:00</updated>
+</entry>
+</feed>
