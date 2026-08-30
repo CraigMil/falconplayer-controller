@@ -66,12 +66,28 @@ def select(entries_by_source, now: datetime, patterns_by_source):
     picks.sort(key=lambda p: p[1]["published"], reverse=True)
 
     cards = []
-    for source, entry in picks[:MAX_CARDS]:
-        title = entry["title"]
+    seen_titles = set()
+    for source, entry in picks:
+        if len(cards) >= MAX_CARDS:
+            break
+        # Two channels frequently post the same game (ESPN and a conference
+        # feed). One card per event, not one per channel.
+        key = "".join(ch for ch in entry["title"].lower() if ch.isalnum())[:36]
+        if key in seen_titles:
+            continue
+        seen_titles.add(key)
+        # Channels are inconsistent: F1 posts "Italian GP | Race Highlights",
+        # while ESPN and the tennis tours post a bare "A vs. B". Splitting on the
+        # pipe unconditionally makes the title and subtitle the same string.
+        raw = entry["title"]
+        if "|" in raw:
+            head, tail = raw.split("|", 1)
+        else:
+            head, tail = raw, source
         cards.append({
             "kind": "highlight", "sport": "highlight", "source": source,
-            "title": title.split("|")[0].strip().upper()[:28],
-            "subtitle": title.split("|")[-1].strip()[:24],
+            "title": head.strip().upper()[:30],
+            "subtitle": tail.strip()[:26],
             "url": f"https://youtu.be/{entry['video_id']}",
             "age": _age(entry["published"], now),
             "published": entry["published"],

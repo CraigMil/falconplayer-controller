@@ -28,10 +28,19 @@ def build_board(now=None, include_practice: bool = False,
     now = now or datetime.now(timezone.utc)
     dates = date_range(now)
 
-    def _events(slug_key: str):
+    def _events(slug_key: str, dated: bool = True):
+        """Fetch one slug's events.
+
+        `dated=False` for tennis and F1. Their scoreboards do NOT filter the way
+        the match-shaped leagues do: asked for 29-30 Aug, tennis/atp returns
+        Winston-Salem but NOT the US Open, and racing/f1 returns nothing at all
+        during a live race weekend. Undated returns the current tournaments and
+        the current GP, which the tournament and session adapters then window
+        themselves.
+        """
         slug = sources.SLUGS[slug_key]
         try:
-            payload = sources.fetch(slug, dates)
+            payload = sources.fetch(slug, dates if dated else None)
         except Exception:
             return []
         return payload.get("events", []) or []
@@ -44,14 +53,19 @@ def build_board(now=None, include_practice: bool = False,
             if card:
                 collected.append(card)
 
+    # The Slams appear on BOTH the ATP and WTA scoreboards under the same name,
+    # and the card is deliberately combined ("Men's & Women's"), so take each
+    # tournament once.
+    seen_tournaments = set()
     for key in _TOURNAMENT:
-        for event in _events(key):
+        for event in _events(key, dated=False):
             card = sources.from_tournament(event, key, now)
-            if card:
+            if card and card["title"] not in seen_tournaments:
+                seen_tournaments.add(card["title"])
                 collected.append(card)
 
     for key in _SESSION:
-        for event in _events(key):
+        for event in _events(key, dated=False):
             collected += sources.from_sessions(event, key, now, include_practice)
 
     collected = select.mark_home(collected)

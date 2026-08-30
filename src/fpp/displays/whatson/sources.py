@@ -209,11 +209,31 @@ def from_tournament(event: dict, sport: str, now=None):
         return None
     comp = comps[0] if comps else {}
     card = _base(sport, start, day, comp, channel, "in" if comps else "pre")
-    rounds = {str((c.get("round") or {}).get("displayName", "")) for c in comps}
+    # The round being played TODAY. Two wrong answers to avoid: sorting the
+    # names alphabetically puts "Final" ahead of "Round of 32", and counting
+    # every match in the tournament is dominated by the completed early rounds —
+    # on day six of the US Open both gave the wrong round.
+    from collections import Counter
+
+    # A Slam's payload is the whole bracket, including future placeholder
+    # matches, so prefer what is on today or tomorrow. When neither has any —
+    # ESPN dates a session by its start, and a night session lands on the next
+    # UTC day — fall back to the earliest matches not yet played.
+    windowed = [c for c in comps if bucket(_iso(c.get("date", "")) or start, now)]
+    if not windowed:
+        upcoming = [c for c in comps
+                    if _state(c) == "pre" and _iso(c.get("date", "")) is not None]
+        if upcoming:
+            soonest = min(_iso(c["date"]) for c in upcoming)
+            windowed = [c for c in upcoming
+                        if (_iso(c["date"]) - soonest).days == 0]
+    tally = Counter(str((c.get("round") or {}).get("displayName", ""))
+                    for c in (windowed or comps))
+    tally.pop("", None)
     card.update({
         "layout": "single",
         "title": event.get("name", "").upper(),
-        "subtitle": next((r for r in sorted(rounds) if r), "In progress"),
+        "subtitle": tally.most_common(1)[0][0] if tally else "In progress",
         "detail": "Men's & Women's",
         "status_text": "ALL DAY",
         "major": True,

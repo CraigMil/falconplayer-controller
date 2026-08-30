@@ -59,7 +59,8 @@ def test_cards_carry_the_dwell_floor_and_an_age():
 
 def test_at_most_three_cards_across_all_sources():
     def entry(i):
-        return {"title": "Race Highlights", "video_id": f"v{i}",
+        # Distinct events — identical titles are deduplicated, which is its own test.
+        return {"title": f"Race {i} | Race Highlights", "video_id": f"v{i}",
                 "published": NOW - timedelta(hours=i + 1)}
 
     by_source = {f"src{i}": [entry(i)] for i in range(6)}
@@ -69,3 +70,30 @@ def test_at_most_three_cards_across_all_sources():
 
 def test_a_malformed_feed_yields_nothing_rather_than_raising():
     assert parse_feed("<not-xml") == []
+
+
+def test_a_title_without_a_pipe_uses_the_source_as_subtitle():
+    entry = {"title": "NC State Wolfpack vs. Virginia Cavaliers",
+             "video_id": "x", "published": NOW - timedelta(hours=1)}
+    card = select({"ESPN College Football": [entry]}, NOW,
+                  {"ESPN College Football": ["vs."]})[0]
+    assert card["title"] == "NC STATE WOLFPACK VS. VIRGINIA"
+    assert card["subtitle"] == "ESPN College Football"
+
+
+def test_a_piped_title_splits_into_event_and_kind():
+    entry = {"title": "Italian GP | Race Highlights", "video_id": "y",
+             "published": NOW - timedelta(hours=1)}
+    card = select({"Formula 1": [entry]}, NOW, {"Formula 1": PATTERNS})[0]
+    assert card["title"] == "ITALIAN GP"
+    assert card["subtitle"] == "Race Highlights"
+
+
+def test_the_same_game_posted_by_two_channels_appears_once():
+    same = {"title": "NC State vs. Virginia | Full Game Highlights",
+            "video_id": "a", "published": NOW - timedelta(hours=1)}
+    dupe = {"title": "NC State vs. Virginia | Full Game Highlights",
+            "video_id": "b", "published": NOW - timedelta(hours=2)}
+    cards = select({"ESPN": [same], "ACC": [dupe]}, NOW,
+                   {"ESPN": ["Highlights"], "ACC": ["Highlights"]})
+    assert len(cards) == 1

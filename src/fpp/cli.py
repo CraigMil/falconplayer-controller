@@ -855,6 +855,129 @@ def scoreboard(ctx: click.Context, league: str, interval: float,
     except KeyboardInterrupt:
         click.echo("\nStopped.")
 
+# ------------------------------------------------------------------ what's on
+
+_WHATSON_PLAYLIST = "fpp-whatson"
+
+
+def _whatson_dwell(slides: list, interval: float, cycle: float,
+                   min_interval: float) -> list:
+    """Per-slide seconds.
+
+    Everything shrinks to fit the cycle EXCEPT cards carrying a dwell_floor —
+    the QR highlight cards. A card you glance at can take six seconds; a card
+    you must notice, then scan with a phone, cannot.
+    """
+    floors = [s.get("dwell_floor") for s in slides]
+    fixed = sum(f for f in floors if f)
+    flexible = [i for i, f in enumerate(floors) if not f]
+    if not flexible:
+        return [f or interval for f in floors]
+    share = (cycle - fixed) / len(flexible)
+    each = max(min_interval, min(interval, share))
+    return [f if f else each for f in floors]
+
+
+@main.command()
+@click.option("--interval", default=12.0, help="Per-card dwell when there is room.")
+@click.option("--cycle", default=210.0, help="Target seconds for a full lap.")
+@click.option("--min-interval", default=6.0, help="Never dwell less than this.")
+@click.option("--refresh", default=600.0, help="Seconds between fetches when nothing is live.")
+@click.option("--live-refresh", default=60.0, help="Seconds between fetches while live.")
+@click.option("--practice", is_flag=True, help="Include F1 practice sessions.")
+@click.option("--no-highlights", is_flag=True, help="Skip the YouTube highlight block.")
+@click.option("--dry-run", is_flag=True, help="Write PNGs locally instead of touching the panel.")
+@click.option("--out", default="/tmp/whatson", help="Where --dry-run writes its cards.")
+@click.pass_context
+def whatson(ctx: click.Context, interval: float, cycle: float, min_interval: float,
+            refresh: float, live_refresh: float, practice: bool,
+            no_highlights: bool, dry_run: bool, out: str) -> None:
+    """Show what sport is on today and tomorrow, and where to watch it.
+
+    A schedule board, not a scoreboard: it surveys the Premier League, the NFL,
+    college football, the European and South American cups, the tennis majors,
+    Formula 1 and a curated list of oddities, then shows only what can actually
+    be watched in the USA — marking anything that would cost extra with a "$".
+
+    The Seattle teams always appear when they play, whatever the sport and
+    whatever the channel, in their own block ahead of today.
+
+    The lap ends with any highlights posted in the last 48 hours, as QR codes to
+    scan with a phone.
+    """
+    import json as _json
+    import os
+    from pathlib import Path
+
+    from .displays import whatson as _w
+    from .displays.whatson.cards import render
+
+    host = ctx.obj["host"]
+
+    def _image_entry(filename: str) -> dict:
+        return {"type": "image", "enabled": 1, "playOnce": 0, "imagePath": filename,
+                "modelName": "LED Panels", "displayMode": "argsOnly"}
+
+    def _pause_entry(secs: float) -> dict:
+        return {"type": "pause", "enabled": 1, "playOnce": 0, "duration": secs,
+                "displayMode": "argsOnly"}
+
+    def _label(slide: dict) -> str:
+        if slide["kind"] == "divider":
+            return f"--- {slide['title']} ---"
+        if slide["kind"] == "highlight":
+            return f"QR {slide.get('title', '')}"
+        if slide["kind"] == "empty":
+            return "nothing on"
+        mark = "$" if slide.get("tier") == "payable" else " "
+        name = slide.get("title") or slide.get("league_label", "")
+        return f"{mark}{name} [{slide.get('channel', '')}]"
+
+    if dry_run:
+        slides, reason = _w.build_board(include_practice=practice,
+                                        with_highlights=not no_highlights)
+        Path(out).mkdir(parents=True, exist_ok=True)
+        # A shorter board than last time would otherwise leave stale cards
+        # behind, and they look exactly like real ones.
+        for old in Path(out).glob("[0-9][0-9].png"):
+            old.unlink()
+        for i, slide in enumerate(slides):
+            path = os.path.join(out, f"{i:02d}.png")
+            render(slide)._img.save(path)
+            click.echo(f"  {path}  {_label(slide)}")
+        click.echo(f"{len(slides)} cards [{reason}] -> {out}")
+        return
+
+    click.echo("Fetching what's on...")
+    try:
+        while True:
+            slides, reason = _w.build_board(include_practice=practice,
+                                            with_highlights=not no_highlights)
+            dwells = _whatson_dwell(slides, interval, cycle, min_interval)
+            entries = []
+            with _client(host) as fpp:
+                click.echo(f"Building board -- {len(slides)} cards [{reason}]")
+                for i, (slide, dwell) in enumerate(zip(slides, dwells)):
+                    name = f"fpp-whatson-{i}.jpg"
+                    fpp.upload_file("images", name, render(slide).to_image_bytes())
+                    click.echo(f"  {_label(slide)}  ({dwell:.0f}s)")
+                    entries += [_image_entry(name), _pause_entry(dwell)]
+                playlist = {
+                    "name": _WHATSON_PLAYLIST, "version": 4, "repeat": 1,
+                    "loopCount": 0, "desc": "", "random": 0, "empty": False,
+                    "leadIn": [], "mainPlaylist": entries, "leadOut": [],
+                }
+                _write_playlist_json(host, _WHATSON_PLAYLIST,
+                                     _json.dumps(playlist, indent=4))
+                fpp.start_playlist(_WHATSON_PLAYLIST, repeat=True)
+
+            wait = max(sum(dwells), live_refresh if reason == "live" else refresh)
+            click.echo(f"Playing -- next refresh in {wait:.0f}s  (Ctrl+C to stop)")
+            time.sleep(wait)
+            click.echo("Refreshing...")
+    except KeyboardInterrupt:
+        click.echo("\nStopped.")
+
 
 # --------------------------------------------------------------- world clock
 

@@ -95,3 +95,26 @@ def test_every_slide_the_board_produces_can_be_rendered(offline):
     slides, _ = whatson.build_board(now=NOW)
     for s in slides:
         assert render(s).to_image_bytes()[:2] == b"\xff\xd8"
+
+
+def test_tennis_and_f1_are_fetched_undated(monkeypatch):
+    """Regression: the dated query drops the US Open and the whole F1 weekend.
+
+    Asked for 20260829-20260830, tennis/atp returns Winston-Salem but not the US
+    Open, and racing/f1 returns nothing during a live race weekend. Both must be
+    fetched undated and windowed by their own adapters.
+    """
+    seen = {}
+
+    def fake_fetch(slug, dates=None):
+        seen[slug] = dates
+        return {"events": []}
+
+    monkeypatch.setattr("fpp.displays.whatson.sources.fetch", fake_fetch)
+    monkeypatch.setattr("fpp.displays.whatson.highlights.fetch_all", lambda now=None: [])
+    whatson.build_board(now=NOW)
+
+    assert seen["tennis/atp"] is None
+    assert seen["tennis/wta"] is None
+    assert seen["racing/f1"] is None
+    assert seen["football/nfl"] == "20260829-20260830"
