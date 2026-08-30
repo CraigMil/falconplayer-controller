@@ -38,6 +38,11 @@ _ALIASES = {
     "Amazon Prime Video": "Prime Video",
     "HBO Max": "Max",
     "Golf Chnl": "Golf Channel",
+    # ESPN's rebrand of ESPN+. Craig has it; unrecognised names default to
+    # payable, so it was showing a "$" on tennis he can already watch.
+    "ESPN Unlmtd": "ESPN+",
+    "ESPN Unlimited": "ESPN+",
+    "ESPN Select": "ESPN+",
 }
 
 # A bare local call sign — KOMO-TV, KING 5, KIRO. These are free over the air,

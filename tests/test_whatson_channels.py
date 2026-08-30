@@ -44,3 +44,12 @@ def test_prefers_watchable_over_payable_and_never_shows_foreign():
 
 def test_no_broadcast_at_all_is_none():
     assert best_channel([]) is None
+
+
+@pytest.mark.parametrize("raw", ["ESPN Unlmtd", "ESPN Unlimited", "ESPN Select"])
+def test_espn_plus_rebrands_are_watchable_not_payable(raw):
+    """These appeared on US Open cards marked '$' — ESPN's own rename of ESPN+,
+    which Craig has. Unrecognised names default to payable, so each alias has
+    to be known explicitly."""
+    assert normalise(raw) == "ESPN+"
+    assert tier_of(raw) == "watchable"

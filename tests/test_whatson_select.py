@@ -134,3 +134,25 @@ def test_tomorrow_is_a_preview_not_a_second_full_board():
     kept = apply_caps(tomorrow)
     assert len(kept) == TOMORROW_CAPS["ncaaf"]
     assert TOMORROW_CAPS["ncaaf"] < CAPS["ncaaf"]
+
+
+def test_home_cards_say_when_a_game_is_tomorrow():
+    """MY TEAMS spans both days, so a bare clock time is ambiguous.
+
+    Arsenal at Aston Villa is 12:00p tomorrow; the card read "12:00p" with
+    nothing to distinguish it from a game starting today at noon.
+    """
+    today = card(sport="epl", day="today", status_text="9:30a", home_team=True)
+    tomorrow = card(sport="epl", day="tomorrow", status_text="12:00p", home_team=True)
+    slides = assemble([today, tomorrow], [], [], NOW)
+    home = [s for s in slides if s.get("home_team")]
+    assert home[0]["status_text"] == "9:30a", "today keeps a bare clock"
+    assert "TMW" in home[1]["status_text"], home[1]["status_text"]
+
+
+def test_a_live_home_game_keeps_its_live_indicator():
+    live = card(sport="mlb", day="today", state="live", status_text="LIVE 3rd",
+                home_team=True)
+    slides = assemble([live], [], [], NOW)
+    home = [s for s in slides if s.get("home_team")][0]
+    assert home["status_text"] == "LIVE 3rd"

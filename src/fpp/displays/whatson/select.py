@@ -162,6 +162,14 @@ def assemble(home, events, highlights, now=None):
 
     slides = []
     if home:
+        # MY TEAMS spans both days, so these cards have no TODAY/TOMORROW
+        # divider above them to borrow the day from — a bare "12:00p" could be
+        # either. Only tomorrow needs marking; a plain clock means today.
+        for c in home:
+            if c.get("day") == "tomorrow" and c.get("state") == "pre":
+                text = c.get("status_text", "")
+                if not text.startswith("TMW"):
+                    c["status_text"] = f"TMW {text}".strip()
         slides.append(divider("MY TEAMS", len(home)))
         slides += home
     for day in ("today", "tomorrow"):
