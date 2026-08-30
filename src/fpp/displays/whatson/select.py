@@ -22,7 +22,7 @@ CAPS = {
 # the TOMORROW block was empty on any day busy enough to fill a cap.
 # Smaller than CAPS on purpose: tomorrow is "what is coming", not a second board.
 TOMORROW_CAPS = {
-    "nfl": 1, "ncaaf": 1, "epl": 2, "cup": 1, "tennis": 1, "f1": 1,
+    "nfl": 2, "ncaaf": 2, "epl": 3, "cup": 1, "tennis": 1, "f1": 1,
     "oddity": 0,
 }
 

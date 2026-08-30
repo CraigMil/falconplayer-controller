@@ -859,6 +859,11 @@ def scoreboard(ctx: click.Context, league: str, interval: float,
 
 _WHATSON_PLAYLIST = "fpp-whatson"
 
+# Slack between the end of a lap and the next rebuild. Uploading a full board
+# and starting the playlist is not free, and without slack the last cards never
+# get their turn.
+_LAP_MARGIN = 15.0
+
 
 def _whatson_dwell(slides: list, interval: float, cycle: float,
                    min_interval: float) -> list:
@@ -958,6 +963,7 @@ def whatson(ctx: click.Context, interval: float, cycle: float, min_interval: flo
         return
 
     click.echo("Fetching what's on...")
+    last_shape = None
     try:
         while True:
             slides, reason = _w.build_board(include_practice=practice,
@@ -979,9 +985,20 @@ def whatson(ctx: click.Context, interval: float, cycle: float, min_interval: flo
                 }
                 _write_playlist_json(host, _WHATSON_PLAYLIST,
                                      _json.dumps(playlist, indent=4))
-                fpp.start_playlist(_WHATSON_PLAYLIST, repeat=True)
+                # Restarting jumps back to card 0, so only do it when the running
+                # order actually changed. Re-uploaded images are picked up in
+                # place, which means scores refresh WITHOUT losing the tail.
+                shape = [(e.get("imagePath"), e.get("duration")) for e in entries]
+                if shape != last_shape:
+                    fpp.start_playlist(_WHATSON_PLAYLIST, repeat=True)
+                    last_shape = shape
+                    click.echo("  (playlist restarted — running order changed)")
 
-            wait = max(sum(dwells), live_refresh if reason == "live" else refresh)
+            # A LAP PLUS A MARGIN. Sleeping exactly one lap meant any overhead at
+            # all — 22 uploads, playlist-start latency — clipped the end of the
+            # board, and the end is always the highlights block.
+            lap = sum(dwells)
+            wait = max(lap + _LAP_MARGIN, live_refresh if reason == "live" else refresh)
             click.echo(f"Playing -- next refresh in {wait:.0f}s  (Ctrl+C to stop)")
             time.sleep(wait)
             click.echo("Refreshing...")
