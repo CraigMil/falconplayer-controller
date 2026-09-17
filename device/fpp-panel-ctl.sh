@@ -5,6 +5,7 @@
 #   fpp-panel-ctl.sh scoreboard status         # a named service
 #   fpp-panel-ctl.sh nfl start                 # ditto
 #   fpp-panel-ctl.sh whatson start             # the what's-on board
+#   fpp-panel-ctl.sh onthisday start           # the history board
 #   fpp-panel-ctl.sh current restart           # whatever is live right now
 #
 # The one-argument form is kept because the HTTP control server and Home
@@ -16,12 +17,12 @@ FPP_BIN=/home/fpp/fpp-worldclock-venv/bin/fpp
 FPP_API=http://127.0.0.1/api
 
 # Long-running loops that own the panel and rebuild their own playlists.
-DISPLAY_SERVICES="fpp-worldclock.service fpp-scoreboard.service fpp-nfl.service fpp-whatson.service"
+DISPLAY_SERVICES="fpp-worldclock.service fpp-scoreboard.service fpp-nfl.service fpp-whatson.service fpp-onthisday.service"
 
 case "$#" in
   1) SVCKEY=worldclock; ACTION="$1" ;;
   2) SVCKEY="$1";       ACTION="$2" ;;
-  *) echo "usage: $0 [worldclock|scoreboard|nfl|whatson|current] {start|stop|restart|enable|disable|status}" >&2; exit 1 ;;
+  *) echo "usage: $0 [worldclock|scoreboard|nfl|whatson|onthisday|current] {start|stop|restart|enable|disable|status}" >&2; exit 1 ;;
 esac
 
 active_display_service() {
@@ -72,6 +73,7 @@ case "$SVCKEY" in
   # January, and switching sports should not mean editing an ExecStart line.
   nfl)        SVC=fpp-nfl.service ;;
   whatson)    SVC=fpp-whatson.service ;;
+  onthisday)  SVC=fpp-onthisday.service ;;
   # Resolved at call time, so "fix whatever is live" needs no argument and no
   # guess from the caller. Home Assistant's own sensors are up to 15s stale;
   # the device knows the truth now.
@@ -126,5 +128,5 @@ case "$ACTION" in
       sudo /usr/bin/systemctl is-active "$SVC"
     fi
     ;;
-  *) echo "usage: $0 [worldclock|scoreboard|nfl|whatson|current] {start|stop|restart|enable|disable|status}" >&2; exit 1 ;;
+  *) echo "usage: $0 [worldclock|scoreboard|nfl|whatson|onthisday|current] {start|stop|restart|enable|disable|status}" >&2; exit 1 ;;
 esac

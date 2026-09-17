@@ -1006,6 +1006,147 @@ def whatson(ctx: click.Context, interval: float, cycle: float, min_interval: flo
         click.echo("\nStopped.")
 
 
+# ------------------------------------------------------------- on this day
+
+_ONTHISDAY_PLAYLIST = "fpp-onthisday"
+
+# Shipped once, by hand, from the led-animations repo — same rule as the NFL
+# intro. This command references it by name and never re-uploads it.
+_ONTHISDAY_INTRO = "onthisday_intro_384.mp4"
+
+
+def _onthisday_intro_entries(fpp, enabled, last_played, now, every_secs):
+    """The playlist leadIn, and when the intro last played.
+
+    Throttled for the same reason as the NFL shield: leadIn fires on every
+    playlist START, and this loop restarts whenever the running order changes.
+    """
+    if not enabled:
+        return [], last_played
+    if last_played is not None and now - last_played < every_secs:
+        return [], last_played
+    if _ONTHISDAY_INTRO not in fpp.list_media():
+        return [], last_played
+    return [
+        {"type": "media", "enabled": 1, "playOnce": 0,
+         "mediaName": _ONTHISDAY_INTRO, "displayMode": "argsOnly"},
+    ], now
+
+
+@main.command("onthisday")
+@click.option("--interval", default=12.0, show_default=True,
+              help="Seconds each international-day card is shown.")
+@click.option("--fact-interval", default=22.0, show_default=True,
+              help="Seconds the history card is shown. Longer — it has to be read.")
+@click.option("--refresh", default=900.0, show_default=True,
+              help="Seconds between rebuilds. Cheap: only a new day costs an API call.")
+@click.option("--no-rebuild", is_flag=True,
+              help="Never call the model; use the cache and the Wikipedia fallback only.")
+@click.option("--intro/--no-intro", default=True, show_default=True,
+              help="Play the ON THIS DAY sting at the head of the loop.")
+@click.option("--intro-every", default=30.0, show_default=True, metavar="MINUTES",
+              help="Minimum minutes between intro plays.")
+@click.option("--dry-run", is_flag=True, help="Write PNGs locally instead of touching the panel.")
+@click.option("--out", default="/tmp/onthisday", help="Where --dry-run writes its cards.")
+@click.pass_context
+def onthisday(ctx: click.Context, interval: float, fact_interval: float,
+              refresh: float, no_rebuild: bool, intro: bool, intro_every: float,
+              dry_run: bool, out: str) -> None:
+    """One meaningful thing that happened somewhere in the world on this date.
+
+    Three cards: the history — the year, the country, and a synopsis short
+    enough to read from a sofa — then the international day observed today, and
+    the one observed tomorrow.
+
+    Wikipedia supplies the events and the model chooses and compresses one, once
+    a day, into a cache the panel reads. The observances are model-named and
+    carry a source URL in the cache; nothing verifies them before they reach the
+    wall.
+    """
+    import json as _json
+    import os
+    from pathlib import Path
+
+    from .displays import onthisday as _o
+    from .displays.onthisday.cards import render
+
+    host = ctx.obj["host"]
+
+    def _image_entry(filename: str) -> dict:
+        return {"type": "image", "enabled": 1, "playOnce": 0, "imagePath": filename,
+                "modelName": "LED Panels", "displayMode": "argsOnly"}
+
+    def _pause_entry(secs: float) -> dict:
+        return {"type": "pause", "enabled": 1, "playOnce": 0, "duration": secs,
+                "displayMode": "argsOnly"}
+
+    def _label(slide: dict) -> str:
+        if slide["kind"] == "fact":
+            bits = [str(slide["year"] or "?"), slide.get("country") or "-",
+                    slide.get("headline") or slide.get("synopsis", "")[:40]]
+            return " | ".join(b for b in bits if b)
+        return f"{slide['kind'].upper()}: {slide.get('name') or '(none listed)'}"
+
+    def _dwell(slide: dict) -> float:
+        return fact_interval if slide["kind"] == "fact" else interval
+
+    if dry_run:
+        slides, tier = _o.build_board(rebuild=not no_rebuild)
+        Path(out).mkdir(parents=True, exist_ok=True)
+        for old in Path(out).glob("[0-9][0-9].png"):
+            old.unlink()
+        for i, slide in enumerate(slides):
+            path = os.path.join(out, f"{i:02d}.png")
+            render(slide)._img.save(path)
+            click.echo(f"  {path}  {_label(slide)}")
+        click.echo(f"{len(slides)} cards [{tier}] -> {out}")
+        return
+
+    click.echo("Building today's card...")
+    last_shape = None
+    last_intro = None
+    try:
+        while True:
+            slides, tier = _o.build_board(rebuild=not no_rebuild)
+            dwells = [_dwell(s) for s in slides]
+            entries = []
+            with _client(host) as fpp:
+                click.echo(f"Building board -- {len(slides)} cards [{tier}]")
+                for i, (slide, dwell) in enumerate(zip(slides, dwells)):
+                    name = f"fpp-onthisday-{i}.jpg"
+                    fpp.upload_file("images", name, render(slide).to_image_bytes())
+                    click.echo(f"  {_label(slide)}  ({dwell:.0f}s)")
+                    entries += [_image_entry(name), _pause_entry(dwell)]
+
+                lead_in, last_intro = _onthisday_intro_entries(
+                    fpp, intro, last_intro, time.monotonic(), intro_every * 60)
+
+                playlist = {
+                    "name": _ONTHISDAY_PLAYLIST, "version": 4, "repeat": 1,
+                    "loopCount": 0, "desc": "", "random": 0, "empty": False,
+                    "leadIn": lead_in, "mainPlaylist": entries, "leadOut": [],
+                }
+                _write_playlist_json(host, _ONTHISDAY_PLAYLIST,
+                                     _json.dumps(playlist, indent=4))
+                # Restarting jumps back to card 0. The content changes once a
+                # day, so without this check a 15-minute refresh would reset the
+                # loop four times an hour and the tomorrow card would rarely be
+                # reached.
+                shape = [(e.get("imagePath"), e.get("duration")) for e in entries]
+                if shape != last_shape or lead_in:
+                    fpp.start_playlist(_ONTHISDAY_PLAYLIST, repeat=True)
+                    last_shape = shape
+                    click.echo("  (playlist restarted)")
+
+            lap = sum(dwells)
+            wait = max(lap + _LAP_MARGIN, refresh)
+            click.echo(f"Playing -- next refresh in {wait:.0f}s  (Ctrl+C to stop)")
+            time.sleep(wait)
+            click.echo("Refreshing...")
+    except KeyboardInterrupt:
+        click.echo("\nStopped.")
+
+
 # --------------------------------------------------------------- world clock
 
 _WORLDCLOCK_PLAYLIST = "fpp-worldclock"  # base name; "-a"/"-b" suffix alternates each cycle

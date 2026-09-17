@@ -1,0 +1,1 @@
+fpp ALL=(root) NOPASSWD: /usr/bin/systemctl start fpp-onthisday.service, /usr/bin/systemctl stop fpp-onthisday.service, /usr/bin/systemctl restart fpp-onthisday.service, /usr/bin/systemctl enable fpp-onthisday.service, /usr/bin/systemctl disable fpp-onthisday.service, /usr/bin/systemctl is-active fpp-onthisday.service

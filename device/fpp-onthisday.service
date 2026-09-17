@@ -1,0 +1,18 @@
+[Unit]
+Description=Falcon Player On This Day board
+After=network-online.target fpp.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fpp
+Environment=FPP_HOST=127.0.0.1
+# The Anthropic key. Root-owned, mode 0600, NOT in this repo — see device/README.md.
+# The board still runs without it, falling back to the Wikipedia extract.
+EnvironmentFile=-/etc/fpp-onthisday.env
+ExecStart=/home/fpp/fpp-worldclock-venv/bin/fpp --host 127.0.0.1 onthisday --interval 12 --fact-interval 22
+Restart=on-failure
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target

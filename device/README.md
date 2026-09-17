@@ -58,7 +58,7 @@ GET  /status
 GET  /scoreboard/status
 ```
 
-Services: `worldclock`, `scoreboard`, `nfl`, `whatson`, `current`. Actions: `start`, `stop`,
+Services: `worldclock`, `scoreboard`, `nfl`, `whatson`, `onthisday`, `current`. Actions: `start`, `stop`,
 `restart`, `status`. There is a per-unit rule in `/etc/sudoers.d/` for each, but
 it is **documentation of intent, not a constraint** — `010_pi-nopasswd` grants
 `fpp` blanket `NOPASSWD: ALL`, so the narrow rules restrict nothing. Adding a
@@ -85,3 +85,29 @@ was running a quarter of a minute ago.
 The bare one-segment paths are kept because Home Assistant has called them that
 way since the server was written, and renaming them would have meant a
 coordinated change across two repos to gain nothing.
+
+
+## `fpp-onthisday` needs a credential the repo does not carry
+
+The On This Day board makes one Anthropic API call per day to choose and
+compress the day's historical fact and to name the international days. The key
+lives in a file this repo deliberately does not contain:
+
+```bash
+sudo install -m 0600 /dev/null /etc/fpp-onthisday.env
+sudo tee /etc/fpp-onthisday.env >/dev/null <<'ENV'
+ANTHROPIC_API_KEY=sk-ant-...
+ENV
+sudo systemctl restart fpp-onthisday.service
+```
+
+The unit references it with `EnvironmentFile=-`, and the leading `-` is
+deliberate: **a missing key is not a startup failure.** Without it the board
+falls back to Wikipedia's own extract — no country and no international days,
+but a panel that still shows something true. `journalctl -u fpp-onthisday` names
+the tier on every rebuild (`fresh`, `rebuilt`, `stale`, `wikipedia`, `static`),
+which is the fastest way to tell a missing key from a dead network.
+
+The answer is cached in `~fpp/.cache/fpp-onthisday/YYYY-MM-DD.json` and kept for
+14 days. Deleting today's file forces a rebuild on the next refresh; that is the
+only way to make the service call the API twice in one day.
