@@ -128,7 +128,11 @@ def oddity_cards(now=None):
             major = today >= _as_date(o["major_from"])
         channel = o["channel"]
         out.append({
-            "kind": "event", "sport": "oddity", "league_label": "ALSO ON",
+            # The curated calendar carries its own sport word (DARTS, RALLY,
+            # ...) because ESPN never names these; the colour stays ALSO ON.
+            "kind": "event", "sport": "oddity",
+            "league_label": (o.get("sport") or "").upper(),
+            "colour_key": "ALSO ON",
             "layout": "single", "title": o["name"].upper(),
             "subtitle": o.get("subtitle", ""), "detail": "",
             "start": here, "day": "today", "state": "live",
@@ -155,17 +159,20 @@ def _day_subtitle(day: str, now=None) -> str:
 
 
 def _mark_oddities(cards):
-    """Head the wildcard cards with ODDITY.
+    """Head the wildcard cards with ODDITY, and name the sport.
 
     Whatever the slot is filled by — a golf tour, a UFC card, a minor ATP
     tournament, an entry from the curated calendar — it is the same thing to
-    the viewer: the one fun wildcard on the board. The sport still sets the
-    colour, and the card body still names the event.
+    the viewer: the one fun wildcard on the board. But "ODDITY" alone does not
+    say what you would be watching: the body names the event ("BMW
+    CHAMPIONSHIP", "ALEXANDRA PALACE") and an event name is not a sport. So the
+    strip reads "ODDITY · GOLF". The sport still sets the colour.
     """
     for c in cards:
         if c.get("kind") == "event" and _bucket_key(c) == "oddity":
-            c.setdefault("colour_key", c.get("league_label", ""))
-            c["league_label"] = "ODDITY"
+            label = c.get("league_label", "")
+            c.setdefault("colour_key", label)
+            c["league_label"] = f"ODDITY · {label}" if label else "ODDITY"
     return cards
 
 

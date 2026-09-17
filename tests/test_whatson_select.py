@@ -181,8 +181,15 @@ def test_oddity_cards_are_labelled_so_the_wildcard_is_obvious():
     golf["bucket"] = "oddity"
     slides = assemble([], [golf], [], NOW)
     odd = [s for s in slides if s.get("kind") == "event"][0]
-    assert odd["league_label"] == "ODDITY"
+    assert odd["league_label"] == "ODDITY \u00b7 GOLF", "the strip names the sport"
     assert odd["colour_key"] == "GOLF", "the sport still sets the colour"
+
+
+def test_an_oddity_with_no_sport_word_still_heads_ODDITY():
+    mystery = card(sport="oddity", league_label="", layout="single")
+    mystery["bucket"] = "oddity"
+    slides = assemble([], [mystery], [], NOW)
+    assert [s for s in slides if s.get("kind") == "event"][0]["league_label"] == "ODDITY"
 
 
 def test_ordinary_cards_keep_their_league_label():
