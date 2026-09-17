@@ -11,6 +11,11 @@ Environment=FPP_HOST=127.0.0.1
 # The board still runs without it, falling back to the Wikipedia extract.
 EnvironmentFile=-/etc/fpp-onthisday.env
 ExecStart=/home/fpp/fpp-worldclock-venv/bin/fpp --host 127.0.0.1 onthisday --interval 12 --fact-interval 22
+# /home/fpp/.cache is root-owned on this device, so the service cannot create
+# its cache under HOME. This makes systemd create /var/cache/fpp-onthisday
+# owned by User= and export CACHE_DIRECTORY, which paths.base() honours.
+CacheDirectory=fpp-onthisday
+CacheDirectoryMode=0700
 Restart=on-failure
 RestartSec=15
 

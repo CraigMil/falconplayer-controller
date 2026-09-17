@@ -21,8 +21,13 @@ MODEL = "claude-opus-5"
 
 # Panel-sized limits. The card renderer wraps and shrinks to fit, but it shrinks
 # to a floor and then overflows, so the real fix is asking for text that fits.
+#
+# SYNOPSIS_CHARS is 155 because the model reliably writes ~145-150 and _trim
+# then cut it mid-clause — a card ending "...across..." every day. Measured: the
+# synopsis band takes six wrapped lines, about 165 characters, before it starts
+# shrinking past legibility. Do not raise this without re-rendering a long one.
 HEADLINE_CHARS = 30
-SYNOPSIS_CHARS = 135
+SYNOPSIS_CHARS = 155
 DAY_NAME_CHARS = 60
 
 _SCHEMA = {

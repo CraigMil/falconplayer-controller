@@ -12,10 +12,11 @@ from __future__ import annotations
 from datetime import date
 from functools import lru_cache
 from io import BytesIO
-from pathlib import Path
 
 import httpx
 from PIL import Image
+
+from . import paths
 
 # The public Wikimedia feed. No key, no quota, but it does want to know who is
 # calling — an unset User-Agent gets 403s under load.
@@ -26,7 +27,7 @@ _UA = "falconplayer-controller/onthisday (https://github.com/CraigMil/falconplay
 # keeps the stripes and crescents from turning to mush.
 _FLAG = "https://flagcdn.com/w80/{code}.png"
 
-FLAG_CACHE = Path.home() / ".cache" / "fpp-onthisday" / "flags"
+FLAG_CACHE = paths.base() / "flags"
 
 
 def events(day: date) -> list[dict]:

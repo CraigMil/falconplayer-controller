@@ -18,14 +18,15 @@ without guessing which half of the pipeline failed.
 from __future__ import annotations
 
 import json
+import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from . import brief, sources
+from . import brief, paths, sources
 from .window import today as _today
 from .window import tomorrow as _tomorrow
 
-CACHE_DIR = Path.home() / ".cache" / "fpp-onthisday"
+CACHE_DIR = paths.base()
 KEEP_DAYS = 14
 
 
@@ -111,11 +112,24 @@ def load(now: datetime | None = None, rebuild: bool = True) -> tuple[dict, str]:
     if rebuild:
         try:
             built = brief.compose(day, _tomorrow(now), events)
-            write(day, built)
+            try:
+                write(day, built)
+            except OSError as exc:
+                # USE THE ANSWER ANYWAY. The call is already paid for; a cache
+                # that cannot be written is a reason to rebuild again tomorrow,
+                # not a reason to fall back to a worse card today.
+                print(f"onthisday: cache write failed, using the brief "
+                      f"uncached ({type(exc).__name__}: {exc})",
+                      file=sys.stderr, flush=True)
             return dict(built, date=day.isoformat(),
                         fact_date=day.isoformat()), "rebuilt"
-        except Exception:
-            pass
+        except Exception as exc:
+            # NEVER swallow this silently. The tier name alone says the brief
+            # failed but not why, and "the key is missing" and "the request was
+            # rejected" need completely different fixes — from the panel they
+            # look identical. Cost real debugging time on the first deploy.
+            print(f"onthisday: brief failed, falling back "
+                  f"({type(exc).__name__}: {exc})", file=sys.stderr, flush=True)
 
     yesterday = read(day - timedelta(days=1))
     if yesterday:
