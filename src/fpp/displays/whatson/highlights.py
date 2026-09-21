@@ -12,6 +12,8 @@ import re
 from datetime import datetime, timedelta, timezone
 from xml.etree import ElementTree
 
+import sys
+
 import httpx
 
 from .config import highlight_sources
@@ -209,6 +211,12 @@ def fetch_all(now=None):
                 r = c.get(FEED.format(source["channel_id"]))
                 r.raise_for_status()
             entries[name] = parse_feed(r.text)
-        except Exception:
+        except Exception as exc:
+            # Survivable, but not silent: an empty list here is
+            # indistinguishable from a day with no highlights, and a blocked
+            # or renamed feed would drop a whole section of the board with
+            # nothing said. YouTube rate-limits the RSS endpoint by IP.
+            print(f"whatson: highlights {name} failed: "
+                  f"{type(exc).__name__}: {exc}", file=sys.stderr)
             entries[name] = []
     return select(entries, now, patterns, sports)

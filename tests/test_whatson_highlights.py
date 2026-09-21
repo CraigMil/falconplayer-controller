@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from fpp.displays.whatson import highlights
 from fpp.displays.whatson.highlights import (
     competition_label,
     matches,
@@ -183,3 +184,24 @@ def test_soccer_falls_back_when_no_competition_is_named():
                   {"CBS Sports Golazo": ["Highlights"]},
                   {"CBS Sports Golazo": "SOCCER"})[0]
     assert card["sport_label"] == "SOCCER"
+
+
+def test_a_failed_feed_is_reported_not_silently_empty(monkeypatch, capsys):
+    """A blocked or dead feed must not read as a quiet day with no highlights.
+
+    fetch_all() deliberately survives a dead source — a broken highlight
+    channel must not cost the schedule board — but returning [] with no word
+    said is how a whole section of the panel can vanish unnoticed.
+    """
+    class Boom:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def get(self, url): raise RuntimeError("404 Not Found")
+
+    monkeypatch.setattr(highlights.httpx, "Client", lambda **kw: Boom())
+    monkeypatch.setattr(highlights, "highlight_sources",
+                        lambda: [{"name": "epl", "channel_id": "UCxxx",
+                                  "label": "EPL", "patterns": ["Highlights"]}])
+    assert highlights.fetch_all() == []
+    err = capsys.readouterr().err
+    assert "epl" in err and "RuntimeError" in err
