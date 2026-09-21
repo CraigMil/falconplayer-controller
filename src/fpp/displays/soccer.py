@@ -12,6 +12,7 @@ query against the league scoreboard instead, which returns the lot.
 from __future__ import annotations
 
 import io
+import sys
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 
@@ -203,8 +204,51 @@ def table_cards(league_key: str) -> list[dict]:
     return out
 
 
-def _daterange(start: datetime, end: datetime) -> str:
-    return f"{start:%Y%m%d}-{end:%Y%m%d}"
+def months_between(start: datetime, end: datetime) -> list[str]:
+    """The `dates=YYYYMM` values covering start..end, in order.
+
+    ESPN stopped accepting `dates=START-END` — every range answers 400 — and a
+    month is what replaced it. The month is stepped rather than incremented so
+    a window running from December reaches January of the next year instead of
+    asking for month 13.
+    """
+    out, year, month = [], start.year, start.month
+    while (year, month) <= (end.year, end.month):
+        out.append(f"{year}{month:02d}")
+        year, month = (year + 1, 1) if month == 12 else (year, month + 1)
+    return out
+
+
+def fetch_games_window(league_key: str, start: datetime,
+                       end: datetime) -> list[dict]:
+    """One league's games between two instants, asked for a month at a time.
+
+    The window is re-applied locally because a month query returns the whole
+    month. That filtering was always needed — ESPN answered a date range
+    generously at its edges too, returning games from the day either side.
+    `end` is exclusive: the Tue->Mon block ends where the next one begins.
+
+    A month that fails is skipped rather than abandoning the rest: losing
+    September must not also cost October.
+    """
+    out, seen = [], set()
+    for month in months_between(start, end):
+        try:
+            games = fetch_games(league_key, month)
+        except Exception as exc:
+            print(f"soccer: {league_key} dates={month} failed: "
+                  f"{type(exc).__name__}: {exc}", file=sys.stderr)
+            continue
+        for game in games:
+            kickoff = _kickoff(game["kickoff"])
+            if kickoff is None or not (start <= kickoff < end):
+                continue
+            if game["event_id"] in seen:
+                continue
+            seen.add(game["event_id"])
+            out.append(game)
+    out.sort(key=lambda g: g["kickoff"])
+    return out
 
 
 def _block_bounds(now: datetime | None = None) -> tuple[datetime, datetime]:
@@ -221,38 +265,28 @@ def _block_bounds(now: datetime | None = None) -> tuple[datetime, datetime]:
     return start, start + timedelta(days=BLOCK_DAYS)
 
 
-def fetch_fixtures(league_keys: list[str], days: int = FIXTURE_DAYS) -> list[dict]:
+def fetch_fixtures(league_keys: list[str], days: int = FIXTURE_DAYS,
+                   now: datetime | None = None) -> list[dict]:
     """Every upcoming fixture in the next `days`, flattened to what a card needs.
 
     ESPN's /teams/{id}/schedule endpoint is the obvious way to ask "when does
     this team play next" and it does not work early in a season — it returned a
-    single event, the game just finished. A date range against the league
-    scoreboard returns all 44 of the next five weeks' fixtures in one request,
-    so that is what this uses.
+    single event, the game just finished. So this reads the league scoreboard
+    instead, a month at a time: the range query it used to send is refused now,
+    and the whole strip read "no fixture scheduled" until it was.
     """
-    now = datetime.now(timezone.utc)
-    span = _daterange(now, now + timedelta(days=days))
+    now = now or datetime.now(timezone.utc)
     out: list[dict] = []
     for key in league_keys:
-        slug, label = LEAGUES[key]
-        try:
-            data = _scoreboard_json(slug, span)
-        except Exception:
-            continue
-        for event in data.get("events", []):
-            comp = event["competitions"][0]
-            competitors = comp.get("competitors", [])
-            home = next((c for c in competitors if c.get("homeAway") == "home"), {})
-            away = next((c for c in competitors if c.get("homeAway") == "away"), {})
-            if not home or not away:
-                continue
+        _, label = LEAGUES[key]
+        for game in fetch_games_window(key, now, now + timedelta(days=days)):
             out.append({
-                "event_id":  str(event.get("id", "")),
-                "date":      event.get("date", ""),
-                "home_id":   str(_team(home).get("id", "")),
-                "away_id":   str(_team(away).get("id", "")),
-                "home_abbr": _team(home).get("abbreviation", "???"),
-                "away_abbr": _team(away).get("abbreviation", "???"),
+                "event_id":  game["event_id"],
+                "date":      game["kickoff"],
+                "home_id":   game["home_id"],
+                "away_id":   game["away_id"],
+                "home_abbr": game["home_abbr"],
+                "away_abbr": game["away_abbr"],
                 "league":    label,
             })
     out.sort(key=lambda f: f["date"])
@@ -376,20 +410,13 @@ def select_cards(league_keys: list[str], max_cards: int = 24) -> tuple[list[dict
     """
     now = datetime.now(timezone.utc)
     start, end = _block_bounds(now)
-    span = _daterange(start, end)
 
+    # fetch_games_window applies the block bounds itself — it has to, since a
+    # month query returns the whole month — so a Monday-night game cannot leak
+    # in from the block just gone.
     block: list[dict] = []
     for key in league_keys:
-        try:
-            block.extend(fetch_games(key, span))
-        except Exception:
-            pass
-
-    # ESPN answers a date range generously at the edges — it has returned games
-    # from the day either side — so the window is re-applied here rather than
-    # trusted. Without it a Monday-night game leaks in from the block just gone.
-    block = [g for g in block
-             if (k := _kickoff(g["kickoff"])) and start <= k.astimezone() < end]
+        block.extend(fetch_games_window(key, start, end))
 
     if block:
         block.sort(key=lambda g: g["kickoff"])
@@ -397,20 +424,15 @@ def select_cards(league_keys: list[str], max_cards: int = 24) -> tuple[list[dict
         rest = [g for g in block if g["state"] != "in"]
         return (live + rest)[:max_cards], "week"
 
-    past = _daterange(now - timedelta(days=LOOKBACK_DAYS), now)
-    ahead = _daterange(now, now + timedelta(days=LOOKBACK_DAYS))
+    lookback = timedelta(days=LOOKBACK_DAYS)
 
     recent: list[dict] = []
     upcoming: list[dict] = []
     for key in league_keys:
-        try:
-            recent += [g for g in fetch_games(key, past) if g["state"] == "post"]
-        except Exception:
-            pass
-        try:
-            upcoming += [g for g in fetch_games(key, ahead) if g["state"] == "pre"]
-        except Exception:
-            pass
+        recent += [g for g in fetch_games_window(key, now - lookback, now)
+                   if g["state"] == "post"]
+        upcoming += [g for g in fetch_games_window(key, now, now + lookback)
+                     if g["state"] == "pre"]
 
     recent.sort(key=lambda g: g["kickoff"])
     upcoming.sort(key=lambda g: g["kickoff"])

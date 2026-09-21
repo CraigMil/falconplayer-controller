@@ -22,7 +22,7 @@ from functools import lru_cache
 import httpx
 
 from ..canvas import WIDTH, Color, Frame
-from .soccer import _hex, _kickoff, next_fixture
+from .soccer import _hex, _kickoff, months_between, next_fixture
 from .soccer import render_scoreboard as _render_card
 
 SITE = "https://site.api.espn.com/apis/site/v2/sports/football/nfl"
@@ -168,16 +168,10 @@ def fetch_games(dates: str | None = None) -> list[dict]:
 def _months(now: datetime, days: int) -> list[str]:
     """The `dates=YYYYMM` values covering now..now+days, in order.
 
-    A 21-day window touches at most two months, but December's window runs
-    into January of the NEXT year, so the month is stepped rather than
-    incremented.
+    The arithmetic is soccer's: both modules lost their windows to the same
+    ESPN change, and two copies of a month-stepping loop would drift.
     """
-    end = now + timedelta(days=days)
-    out, year, month = [], now.year, now.month
-    while (year, month) <= (end.year, end.month):
-        out.append(f"{year}{month:02d}")
-        year, month = (year + 1, 1) if month == 12 else (year, month + 1)
-    return out
+    return months_between(now, now + timedelta(days=days))
 
 
 def fetch_fixtures(days: int = FIXTURE_DAYS,
