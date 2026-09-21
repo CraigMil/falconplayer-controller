@@ -43,18 +43,18 @@ COMPETITION_RANK = {
 _FAR_FUTURE = datetime.max.replace(tzinfo=timezone.utc)
 
 
-_ALSO_ON = {"golf", "ufc", "boxing"}
+_ALSO_ON = {"golf", "ufc"}
 
 
 def _bucket_key(card: dict) -> str:
-    # An explicit override wins: minor tennis, golf, UFC and boxing all belong
-    # in the ALSO ON slot regardless of what sport they nominally are.
+    # An explicit override wins: minor tennis, golf and UFC all belong in the
+    # ALSO ON slot regardless of what sport they nominally are.
     if card.get("bucket"):
         return card["bucket"]
     if card.get("is_cup"):
         return "cup"
-    # Golf, UFC and boxing share the ALSO ON slot with the curated oddities:
-    # they are the same thing to the viewer — something fun that is on tonight.
+    # Golf and UFC share the ALSO ON slot with the curated oddities: they are
+    # the same thing to the viewer — something fun that is on tonight.
     if card["sport"] in _ALSO_ON:
         return "oddity"
     if card["sport"] in ("atp", "wta"):
@@ -215,7 +215,7 @@ def guarantee_oddity(picked, pool):
     """Make sure something fun is always on the board.
 
     Craig wants at least one ALSO ON card every day. The pool is deep — four
-    golf tours, UFC, boxing, the curated calendar, and every minor ATP/WTA
+    golf tours, UFC, the curated calendar, and every minor ATP/WTA
     tournament — but it can still come up empty on a quiet Tuesday. Rather than
     show nothing, promote the best leftover event from a sport the board is not
     already showing, so the slot is filled with variety rather than a fourth

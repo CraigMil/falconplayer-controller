@@ -45,7 +45,6 @@ SLUGS = {
     "golf_champions": "golf/champions-tour",
     "lacrosse": "lacrosse/pll",
     "ufc": "mma/ufc",
-    "boxing": "boxing",
 }
 
 LABELS = {
@@ -54,7 +53,7 @@ LABELS = {
     "concacaf": "CONCACAF", "atp": "TENNIS", "wta": "TENNIS", "f1": "F1",
     "mlb": "MLB", "nhl": "NHL", "mls": "MLS", "nwsl": "NWSL", "wnba": "WNBA",
     "ncaab": "NCAAB", "golf": "GOLF", "golf_lpga": "LPGA", "golf_eur": "GOLF",
-    "golf_champions": "GOLF", "ufc": "UFC", "boxing": "BOXING",
+    "golf_champions": "GOLF", "ufc": "UFC",
     "lacrosse": "LACROSSE",
 }
 
@@ -301,7 +300,11 @@ def from_sessions(event: dict, sport: str, now=None, include_practice: bool = Fa
 
 def from_multiday(event: dict, sport: str, now=None):
     """A whole-event card for sports ESPN models as one multi-day happening:
-    a golf tournament, a UFC fight card, a boxing bill.
+    a golf tournament, a UFC fight card, a lacrosse weekend.
+
+    Boxing belonged on that list and was removed: ESPN has no boxing feed at
+    all — `sports/boxing/leagues` is the one sport of the lot that 400s — so
+    the slug 404d on every refresh from the day it was added.
 
     Distinct from from_tournament, which is tennis-specific and insists on a
     major. These fill the ALSO ON slot, so they have no majorness requirement —
@@ -341,7 +344,7 @@ def from_multiday(event: dict, sport: str, now=None):
     comp = comps[0]
     card = _base(sport, start, day, comp, channel, _state(comp))
     headline = ""
-    if sport in ("ufc", "boxing"):
+    if sport == "ufc":
         # The main event is the draw, and it is in the event name after the colon.
         headline = event.get("name", "").split(":", 1)[-1].strip()
     else:

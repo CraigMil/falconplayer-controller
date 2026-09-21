@@ -21,7 +21,7 @@ _MATCH = ["nfl", "ncaaf", "epl", "ucl", "uel", "facup", "libertadores",
 _TOURNAMENT = ["atp", "wta"]
 _SESSION = ["f1"]
 _MULTIDAY = ["golf", "golf_lpga", "golf_eur", "golf_champions", "ufc",
-             "boxing", "lacrosse"]
+             "lacrosse"]
 _HOME_ONLY = ["mlb", "nhl", "mls", "nwsl", "wnba", "ncaab"]
 
 

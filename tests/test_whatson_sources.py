@@ -119,10 +119,6 @@ def test_an_out_of_window_multiday_event_is_dropped():
     assert from_multiday(ev, "golf", far) is None
 
 
-def test_boxing_out_of_season_yields_nothing():
-    assert load("boxing_empty")["events"] == []
-
-
 def test_tennis_matches_are_ordered_by_best_seed():
     us_open = [e for e in load("tennis_atp")["events"] if e["name"] == "US Open"][0]
     # The fixture's matches are all completed qualifying, so force them live and

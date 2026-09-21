@@ -27,7 +27,6 @@ SLUG_FIXTURES = {
     "basketball/wnba": "wnba_20260829",
     "golf/pga": "golf_pga",
     "mma/ufc": "ufc",
-    "boxing": "boxing_empty",
 }
 
 
@@ -89,7 +88,7 @@ def test_no_fake_oddity_when_only_one_sport_is_on(monkeypatch):
     The board would rather carry no ALSO ON card than relabel a fourth college
     football game as one — that reads as more of the same. The real defence
     against an empty slot is the breadth of the pool (four golf tours, UFC,
-    boxing, every minor ATP/WTA event), not a fake.
+    every minor ATP/WTA event), not a fake.
     """
     from fpp.displays.whatson.select import _bucket_key
 
