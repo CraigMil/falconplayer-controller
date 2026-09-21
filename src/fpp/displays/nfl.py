@@ -165,21 +165,55 @@ def fetch_games(dates: str | None = None) -> list[dict]:
     return out
 
 
-def fetch_fixtures(days: int = FIXTURE_DAYS) -> list[dict]:
-    """Flat upcoming-fixture list, in the shape `next_fixture()` expects."""
-    now = datetime.now(timezone.utc)
-    span = f"{now:%Y%m%d}-{now + timedelta(days=days):%Y%m%d}"
-    out = []
-    for card in fetch_games(span):
-        out.append({
-            "event_id":  card["event_id"],
-            "date":      card["kickoff"],
-            "home_id":   card["home_id"],
-            "away_id":   card["away_id"],
-            "home_abbr": card["home_abbr"],
-            "away_abbr": card["away_abbr"],
-            "league":    LEAGUE_LABEL,
-        })
+def _months(now: datetime, days: int) -> list[str]:
+    """The `dates=YYYYMM` values covering now..now+days, in order.
+
+    A 21-day window touches at most two months, but December's window runs
+    into January of the NEXT year, so the month is stepped rather than
+    incremented.
+    """
+    end = now + timedelta(days=days)
+    out, year, month = [], now.year, now.month
+    while (year, month) <= (end.year, end.month):
+        out.append(f"{year}{month:02d}")
+        year, month = (year + 1, 1) if month == 12 else (year, month + 1)
+    return out
+
+
+def fetch_fixtures(days: int = FIXTURE_DAYS,
+                   now: datetime | None = None) -> list[dict]:
+    """Flat upcoming-fixture list, in the shape `next_fixture()` expects.
+
+    Asked a month at a time. This was one `dates=START-END` call until ESPN
+    stopped accepting ranges and answered 400 to every one — which the caller
+    reported but nobody read, so the strip at the foot of each card quietly
+    said "no fixture scheduled" for every team.
+
+    A month is the right unit rather than a week: week numbering restarts at
+    the post-season, so week arithmetic needs the season type too, while
+    `dates=YYYYMM` returns whatever the month holds — the January payload
+    carries regular-season and post-season games side by side.
+    """
+    now = now or datetime.now(timezone.utc)
+    horizon = now + timedelta(days=days)
+    out, seen = [], set()
+    for month in _months(now, days):
+        for card in fetch_games(month):
+            if card["event_id"] in seen:
+                continue
+            kickoff = _kickoff(card["kickoff"])
+            if kickoff is None or kickoff > horizon:
+                continue
+            seen.add(card["event_id"])
+            out.append({
+                "event_id":  card["event_id"],
+                "date":      card["kickoff"],
+                "home_id":   card["home_id"],
+                "away_id":   card["away_id"],
+                "home_abbr": card["home_abbr"],
+                "away_abbr": card["away_abbr"],
+                "league":    LEAGUE_LABEL,
+            })
     out.sort(key=lambda f: f["date"])
     return out
 
