@@ -440,6 +440,15 @@ LOGO_CY = 66
 # crest that corridor: at size 36 its ink runs y=98..124, and the status bar
 # starts at 126. Anything lower clips.
 SCORE_Y = 111
+
+# The record-and-rating line, and the logo geometry that makes room for it.
+# The card has no spare band: the team name sits at y=29 and the full-size
+# logo starts at y=35. A card that carries the line therefore shrinks its
+# logo by 10px and drops its centre by 5, opening y=35..46. Cards without the
+# line (every soccer card) keep the full 62px shield.
+META_Y = 40
+META_LOGO_SIZE = 52
+META_LOGO_CY = 71
 # Full strength. It went 0.55 -> 0.75 when the disc behind the logo was
 # removed, because the disc had been supplying the contrast that made a mark
 # readable against its own club colour. The club colour is now gone too, and
@@ -501,7 +510,8 @@ def _brighten(logo: Image.Image) -> Image.Image:
     return Image.merge("RGBA", (r.point(lut), g.point(lut), b.point(lut), a))
 
 
-def _place_logo(frame: Frame, url: str, cx: int, cy: int) -> None:
+def _place_logo(frame: Frame, url: str, cx: int, cy: int,
+                size: int = LOGO_SIZE) -> None:
     """Composite a logo centered at (cx, cy), lifted to full brightness.
 
     There used to be a translucent disc behind the logo for contrast. It was
@@ -521,7 +531,7 @@ def _place_logo(frame: Frame, url: str, cx: int, cy: int) -> None:
     if logo is None:
         return
     logo = _brighten(_crop_to_ink(logo.copy()))
-    logo.thumbnail((LOGO_SIZE, LOGO_SIZE), Image.LANCZOS)
+    logo.thumbnail((size, size), Image.LANCZOS)
     lw, lh = logo.size
     frame.paste(logo, cx - lw // 2, cy - lh // 2, opacity=LOGO_OPACITY)
 
@@ -563,6 +573,19 @@ def _next_row(frame: Frame, y: int, abbr: str, colour: Color, nxt: dict | None) 
 CARD_FG = (255, 255, 255)
 
 
+def _meta_line(game: dict, prefix: str) -> str:
+    """"2-1 · FPI 4th", or as much of it as the card actually has.
+
+    Either half can be missing — a team in preseason week one has no record,
+    and a team absent from the power index has no rank — so the separator is
+    joined rather than formatted in, and a card with neither gets no line at
+    all.
+    """
+    record = game.get(f"{prefix}_record") or ""
+    fpi = game.get(f"{prefix}_fpi") or ""
+    return " · ".join(p for p in (record, f"FPI {fpi}" if fpi else "") if p)
+
+
 def render_scoreboard(game: dict) -> Frame:
     away_fg = home_fg = CARD_FG
 
@@ -581,8 +604,20 @@ def render_scoreboard(game: dict) -> Frame:
     frame.text_fit(48,  29, game["away_name"], max_width=90, size=10, color=away_fg)
     frame.text_fit(144, 29, game["home_name"], max_width=90, size=10, color=home_fg)
 
-    _place_logo(frame, game["away_logo"], cx=48,  cy=LOGO_CY)
-    _place_logo(frame, game["home_logo"], cx=144, cy=LOGO_CY)
+    # Record and power rating, NFL only — a soccer card sets neither field and
+    # is rendered exactly as it was before.
+    away_meta, home_meta = _meta_line(game, "away"), _meta_line(game, "home")
+    if away_meta or home_meta:
+        frame.text_fit(48,  META_Y, away_meta, max_width=88, size=9,
+                       color=(150, 150, 150))
+        frame.text_fit(144, META_Y, home_meta, max_width=88, size=9,
+                       color=(150, 150, 150))
+        logo_size, logo_cy = META_LOGO_SIZE, META_LOGO_CY
+    else:
+        logo_size, logo_cy = LOGO_SIZE, LOGO_CY
+
+    _place_logo(frame, game["away_logo"], cx=48,  cy=logo_cy, size=logo_size)
+    _place_logo(frame, game["home_logo"], cx=144, cy=logo_cy, size=logo_size)
 
     state = game["state"]
     if state == "pre":

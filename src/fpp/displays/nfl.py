@@ -47,6 +47,11 @@ LEADER_ROWS = 8
 # pool costs a request per player. Half an hour is far finer than the data.
 STAT_TTL = 1800
 
+# ESPN reruns the power index once a day — the payload stamps itself
+# `lastUpdated 06:00Z`. Six hours keeps it fresh without asking four times an
+# hour for a number that moves weekly.
+FPI_TTL = 21600
+
 
 def _get(url: str) -> dict:
     resp = httpx.get(url, timeout=15)
@@ -78,6 +83,19 @@ def _period_label(period: int) -> str:
     return f"Q{period}"
 
 
+def _record(competitor: dict) -> str:
+    """The overall win-loss record, "2-1".
+
+    ESPN sends a LIST of records — overall, home, road — and the overall one is
+    not reliably first, so it is selected by type rather than by position.
+    Preseason week one has no records at all; the card must still build.
+    """
+    for rec in competitor.get("records") or []:
+        if rec.get("type") == "total":
+            return rec.get("summary", "")
+    return ""
+
+
 def _card_from_event(event: dict) -> dict | None:
     comp = (event.get("competitions") or [{}])[0]
     competitors = comp.get("competitors", [])
@@ -100,6 +118,10 @@ def _card_from_event(event: dict) -> dict | None:
             f"{prefix}_color":      _hex(team.get("color", "")),
             f"{prefix}_alt_color":  _hex(team.get("alternateColor", "")),
             f"{prefix}_logo":       team.get("logo", ""),
+            f"{prefix}_record":     _record(c),
+            # Filled in by attach_fpi(), which needs one request for all 32
+            # teams and so cannot run from inside a per-event loop.
+            f"{prefix}_fpi":        "",
         }
 
     card = {
@@ -162,6 +184,55 @@ def fetch_fixtures(days: int = FIXTURE_DAYS) -> list[dict]:
     return out
 
 
+# ------------------------------------------------------------------ power index
+
+
+def _fpi_season(now: datetime | None = None) -> int:
+    """The season a date belongs to. January's playoffs are last year's season."""
+    here = now or datetime.now(timezone.utc)
+    return here.year - 1 if here.month < 3 else here.year
+
+
+@lru_cache(maxsize=4)
+def _fpi_ranks(bucket: int) -> dict[str, str]:
+    """Team id -> FPI rank ("1st"), for all 32 teams in one request.
+
+    `bucket` expires the cache the same way `_stats_cached` does. `limit=40`
+    matters: the default page size is 25, so the plain endpoint answers with
+    two pages and silently omits seven teams.
+
+    ESPN being unreachable costs the rating, not the card — every caller
+    degrades to showing the record alone.
+    """
+    url = (f"{CORE}/seasons/{_fpi_season()}/powerindex?limit=40")
+    try:
+        data = _get(url)
+    except Exception:
+        return {}
+    out: dict[str, str] = {}
+    for item in data.get("items", []):
+        # The item names its team only by $ref, so the id is parsed from the
+        # tail of that URL rather than costing a request per team.
+        ref = (item.get("team") or {}).get("$ref", "")
+        match = re.search(r"/teams/(\d+)", ref)
+        if not match:
+            continue
+        rank = next((p.get("displayValue", "") for p in item.get("predictives", [])
+                     if p.get("name") == "fpirank"), "")
+        if rank:
+            out[match.group(1)] = rank
+    return out
+
+
+def attach_fpi(cards: list[dict]) -> list[dict]:
+    """Stamp each side with its FPI rank. One request serves every card."""
+    ranks = _fpi_ranks(int(time.time() // FPI_TTL))
+    for c in cards:
+        c["away_fpi"] = ranks.get(c["away_id"], "")
+        c["home_fpi"] = ranks.get(c["home_id"], "")
+    return cards
+
+
 def attach_next(cards: list[dict], fixtures: list[dict]) -> list[dict]:
     for c in cards:
         c["home_next"] = next_fixture(fixtures, c["home_id"], c["event_id"])
@@ -179,7 +250,10 @@ def select_cards(max_cards: int = 24) -> tuple[list[dict], str]:
         return [], "idle"
     live = [g for g in games if g["state"] == "in"]
     rest = [g for g in games if g["state"] != "in"]
-    return (live + rest)[:max_cards], "week"
+    picked = (live + rest)[:max_cards]
+    # One request for all 32 teams, and it cannot fail the board: a bad fetch
+    # leaves the ranks empty and each card falls back to its record alone.
+    return attach_fpi(picked), "week"
 
 
 def render_game(card: dict) -> Frame:
