@@ -6,10 +6,11 @@ this package.
 
 from __future__ import annotations
 
+import sys
 from datetime import datetime, timezone
 
 from . import cards, channels, config, highlights, select, sources, window
-from .window import date_range
+from .window import date_params
 
 __all__ = ["build_board", "cards", "channels", "config", "highlights",
            "select", "sources", "window"]
@@ -28,10 +29,10 @@ def build_board(now=None, include_practice: bool = False,
                 with_highlights: bool = True):
     """The full slide list, plus a one-word reason for the log line."""
     now = now or datetime.now(timezone.utc)
-    dates = date_range(now)
+    dates = date_params(now)
 
     def _events(slug_key: str, dated: bool = True):
-        """Fetch one slug's events.
+        """Fetch one slug's events, a day at a time.
 
         `dated=False` for tennis and F1. Their scoreboards do NOT filter the way
         the match-shaped leagues do: asked for 29-30 Aug, tennis/atp returns
@@ -39,13 +40,29 @@ def build_board(now=None, include_practice: bool = False,
         during a live race weekend. Undated returns the current tournaments and
         the current GP, which the tournament and session adapters then window
         themselves.
+
+        A dated league gets one request PER DAY: ESPN answers 400 to the
+        `dates=START-END` range this used to send. A fetch that fails is
+        reported rather than passed over in silence — a quiet empty list looks
+        exactly like a quiet day, which is how the board lost every dated
+        league at once and nobody saw an error.
         """
         slug = sources.SLUGS[slug_key]
-        try:
-            payload = sources.fetch(slug, dates if dated else None)
-        except Exception:
-            return []
-        return payload.get("events", []) or []
+        out, seen_ids = [], set()
+        for param in (dates if dated else [None]):
+            try:
+                payload = sources.fetch(slug, param)
+            except Exception as exc:
+                print(f"whatson: {slug} dates={param} failed: "
+                      f"{type(exc).__name__}: {exc}", file=sys.stderr)
+                continue
+            for event in payload.get("events", []) or []:
+                key = event.get("id") or id(event)
+                if key in seen_ids:
+                    continue
+                seen_ids.add(key)
+                out.append(event)
+        return out
 
     collected = []
 

@@ -147,14 +147,16 @@ def test_tennis_and_f1_are_fetched_undated(monkeypatch):
     seen = {}
 
     def fake_fetch(slug, dates=None):
-        seen[slug] = dates
+        seen.setdefault(slug, []).append(dates)
         return {"events": []}
 
     monkeypatch.setattr("fpp.displays.whatson.sources.fetch", fake_fetch)
     monkeypatch.setattr("fpp.displays.whatson.highlights.fetch_all", lambda now=None: [])
     whatson.build_board(now=NOW)
 
-    assert seen["tennis/atp"] is None
-    assert seen["tennis/wta"] is None
-    assert seen["racing/f1"] is None
-    assert seen["football/nfl"] == "20260829-20260830"
+    assert seen["tennis/atp"] == [None]
+    assert seen["tennis/wta"] == [None]
+    assert seen["racing/f1"] == [None]
+    # One request per day. ESPN 400s on `dates=START-END`, so a dated league
+    # must ask for each day separately or it comes back with nothing at all.
+    assert seen["football/nfl"] == ["20260829", "20260830"]

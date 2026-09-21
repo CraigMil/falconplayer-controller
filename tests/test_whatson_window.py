@@ -2,13 +2,19 @@
 
 from datetime import datetime, timezone
 
-from fpp.displays.whatson.window import PACIFIC, bucket, clock, date_range
+from fpp.displays.whatson.window import PACIFIC, bucket, clock, date_params
 
 NOW = datetime(2026, 8, 29, 14, 0, tzinfo=timezone.utc)  # 7am PDT, Sat 29 Aug
 
 
-def test_date_range_covers_today_and_tomorrow_in_pacific():
-    assert date_range(NOW) == "20260829-20260830"
+def test_date_params_are_one_per_day_not_a_range():
+    """ESPN stopped accepting `dates=START-END` — a range now 400s.
+
+    Regression: every dated league (NFL, NCAAF, EPL, and the home-only
+    leagues that exist to find Craig's teams) silently returned nothing,
+    so the board shrank to the undated sports and MY TEAMS vanished.
+    """
+    assert date_params(NOW) == ["20260829", "20260830"]
 
 
 def test_utc_evening_game_is_still_today_in_pacific():

@@ -24,10 +24,18 @@ def bounds(now: datetime | None = None):
     return start, start + timedelta(days=2)
 
 
-def date_range(now: datetime | None = None) -> str:
-    """The ESPN `dates=` parameter covering today and tomorrow."""
-    start, end = bounds(now)
-    return f"{start:%Y%m%d}-{(end - timedelta(days=1)):%Y%m%d}"
+def date_params(now: datetime | None = None) -> list[str]:
+    """One ESPN `dates=` value per day in the window — today, then tomorrow.
+
+    This used to be a single `START-END` range, which ESPN no longer accepts:
+    `dates=20260920-20260921` answers 400 on every scoreboard. A single day
+    still works, so the window is asked for a day at a time and merged. The
+    failure was invisible — the caller swallowed the error and every dated
+    league (including the home-only ones that exist to find Craig's teams)
+    just came back empty, leaving only the undated sports on the board.
+    """
+    start, _ = bounds(now)
+    return [f"{start + timedelta(days=i):%Y%m%d}" for i in range(2)]
 
 
 def bucket(start: datetime, now: datetime | None = None):
