@@ -155,6 +155,117 @@ def _empty(frame: Frame, card: dict) -> Frame:
 _VS = re.compile(r"\s+(?:vs\.?|v\.?|versus)\s+", re.I)
 
 
+# "PARMA: EXTENDED HIGHLIGHTS", but also "NEW ENGLAND PATRIOTS GAME
+# HIGHLIGHTS" — YouTube posts the descriptor with no separator at all, and
+# glued to the opponent it inflates the name by half again. The word alone is
+# left be: a card titled just "HIGHLIGHTS" would otherwise render empty.
+_DESCRIPTOR = re.compile(
+    r"\s*[:|]?\s*(?:GAME|EXTENDED|MATCH|FULL|CONDENSED)?\s*HIGHLIGHTS\s*$", re.I)
+
+
+def _strip_descriptor(name: str) -> str:
+    """Drop a trailing "... HIGHLIGHTS" from a competitor's name.
+
+    Redundant on a card already headed "NFL HIGHLIGHTS", and it is the
+    difference between a name that fits on one line and one that does not.
+    """
+    stripped = _DESCRIPTOR.sub("", name).strip()
+    return stripped or name.strip()
+
+
+def _greedy_lines(frame: Frame, text: str, max_width: int, size: int):
+    """Break text into the fewest lines that each fit `max_width` at `size`."""
+    out, cur = [], ""
+    for word in text.split():
+        candidate = f"{cur} {word}".strip()
+        if cur and frame.text_width(candidate, size) > max_width:
+            out.append(cur)
+            cur = word
+        else:
+            cur = candidate
+    if cur:
+        out.append(cur)
+    return out or [""]
+
+
+def _clip(frame: Frame, text: str, max_width: int, size: int) -> str:
+    """Cut text — mid-word if it must — until it fits. The last resort."""
+    if frame.text_width(text, size) <= max_width:
+        return text
+    cut = text
+    while cut and frame.text_width(cut + "\u2026", max_width and size) > max_width:
+        cut = cut[:-1]
+    return (cut + "\u2026") if cut else ""
+
+
+def _fit_lines(frame: Frame, text: str, max_width: int, size: int,
+               min_size: int = 7, max_lines: int = 2):
+    """Lines that FIT, wrapping before shrinking. Returns (lines, size).
+
+    text_fit does the opposite: it shrinks to its floor and then overflows,
+    silently, because it never clips. That is how a long club name ended up
+    8px tall next to a 15px opponent and still ran off both edges.
+
+    Wrapping is tried first at the largest size, so the text stays as big as
+    the line budget allows. Only when even `max_lines` will not hold it does
+    the size come down, and only when the floor is reached is anything cut.
+    """
+    for trial in range(size, min_size - 1, -1):
+        lines = _greedy_lines(frame, text, max_width, trial)
+        if len(lines) <= max_lines and all(
+                frame.text_width(ln, trial) <= max_width for ln in lines):
+            return lines, trial
+    lines = _greedy_lines(frame, text, max_width, min_size)[:max_lines]
+    return [_clip(frame, ln, max_width, min_size) for ln in lines], min_size
+
+
+def _block_height(rows) -> int:
+    """Total pixel height of a stack of (lines, size, colour) groups."""
+    return sum(round(size * 1.35) for lines, size, _ in rows for _ in lines)
+
+
+def _matchup_rows(frame: Frame, title: str, width: int, top: int, bottom: int):
+    """The name / vs / name stack, sized to fit the band in BOTH directions.
+
+    Width alone is not enough. Wrapping two long clubs gives five rows where
+    the layout assumed three, and the stack then ran past the band and drew
+    the tail of the second name straight over the QR code. So the size comes
+    down until the block fits the height as well — and both names are always
+    measured at the SAME size, or the card shows one club at 15px and its
+    opponent at 8px.
+    """
+    names = [_strip_descriptor(part.strip())
+             for part in _VS.split(title, maxsplit=1)]
+    for trial in range(15, 7, -1):
+        fitted = [_fit_lines(frame, name, width, trial, min_size=8, max_lines=2)
+                  for name in names]
+        size = min(sz for _, sz in fitted)
+        lines = [_fit_lines(frame, name, width, size, min_size=8, max_lines=2)[0]
+                 for name in names]
+        rows = [(lines[0], size, FG), (["vs"], 9, DIM), (lines[1], size, FG)]
+        if _block_height(rows) <= bottom - top:
+            return rows
+    return rows
+
+
+def _draw_block(frame: Frame, rows, top: int, bottom: int) -> None:
+    """Centre a stack of (lines, size, colour) groups in a vertical band.
+
+    Positions come from the actual line count rather than fixed fractions of
+    the band: a matchup that wraps to two lines a side is five rows where it
+    used to be three, and fractions tuned for three put them on top of one
+    another.
+    """
+    flat = [(line, size, colour)
+            for lines, size, colour in rows for line in lines]
+    heights = [round(size * 1.35) for _, size, _ in flat]
+    y = top + max(0, (bottom - top - sum(heights)) // 2)
+    for (line, size, colour), height in zip(flat, heights):
+        frame.text(W // 2, y + height // 2, line, size=size, color=colour,
+                   anchor="mm")
+        y += height
+
+
 def _wrap(text: str, lines: int = 2):
     """Split into at most `lines` balanced word-lines.
 
@@ -206,33 +317,25 @@ def _highlight(frame: Frame, card: dict) -> Frame:
 
     title = card.get("title", "")
     parts = _VS.split(title, maxsplit=1)
-    if len(parts) == 2:
-        # "Juventus vs. Parma: Extended Highlights" — the descriptor rides along
-        # on the second name and has to come off, or the opponent reads as
-        # "PARMA: EXTENDED HIGHLIGHTS".
-        parts[1] = re.split(r"\s*[:|]\s*", parts[1], maxsplit=1)[0]
     top, bottom = 14, qr_y
+    width = W - 8
+
     if len(parts) == 2:
-        # Two competitors, one per line, with the whole band to themselves.
-        frame.text_fit(W // 2, top + (bottom - top) * 0.26, parts[0].strip(),
-                       max_width=W - 8, size=15, min_size=8, color=FG, anchor="mm")
-        frame.text_fit(W // 2, top + (bottom - top) * 0.55, "vs", max_width=40,
-                       size=9, min_size=7, color=DIM, anchor="mm")
-        frame.text_fit(W // 2, top + (bottom - top) * 0.80, parts[1].strip(),
-                       max_width=W - 8, size=15, min_size=8, color=FG, anchor="mm")
+        # "Juventus vs. Parma: Extended Highlights" — the descriptor rides
+        # along on the second name and has to come off, or the opponent reads
+        # as "PARMA: EXTENDED HIGHLIGHTS".
+        _draw_block(frame, _matchup_rows(frame, title, width, top, bottom),
+                    top, bottom)
+        return frame
+
+    rows, size = _fit_lines(frame, title, width, 16, min_size=8, max_lines=3)
+    if len(rows) == 1:
+        _draw_block(frame, [(rows, size, FG),
+                            ([card.get("subtitle", "")], 12, DIM)], top, bottom)
     else:
-        rows = _wrap(title, 2)
-        if len(rows) == 1:
-            frame.text_fit(W // 2, top + (bottom - top) * 0.35, rows[0],
-                           max_width=W - 8, size=16, min_size=8, color=FG, anchor="mm")
-            frame.text_fit(W // 2, top + (bottom - top) * 0.75, card.get("subtitle", ""),
-                           max_width=W - 8, size=12, min_size=7, color=DIM, anchor="mm")
-        else:
-            # A wrapped headline takes the whole band; the subtitle would only
-            # squeeze it further, and it says less.
-            for n, row in enumerate(rows):
-                frame.text_fit(W // 2, top + (bottom - top) * (0.30 + 0.40 * n), row,
-                               max_width=W - 8, size=14, min_size=7, color=FG, anchor="mm")
+        # A wrapped headline takes the whole band; the subtitle would only
+        # squeeze it further, and it says less.
+        _draw_block(frame, [(rows, size, FG)], top, bottom)
     return frame
 
 
