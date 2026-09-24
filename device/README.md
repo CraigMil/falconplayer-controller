@@ -15,6 +15,9 @@ see the paths below.
 | `fpp-whatson.service` | `/etc/systemd/system/` |
 | `sudoers-fpp-whatson` | `/etc/sudoers.d/fpp-whatson` (mode 0440, root:root) |
 | `fpp-worldclock-control.service` | `/etc/systemd/system/` |
+| `fpp-fppd-recycle.sh` | `/home/fpp/fpp-fppd-recycle.sh` (mode 0755) |
+| `fpp-fppd-recycle.service` | `/etc/systemd/system/` |
+| `fpp-fppd-recycle.timer` | `/etc/systemd/system/` (enabled) |
 
 The Python package itself is an **editable install** at
 `/home/fpp/falconplayer-controller`, into the venv at
@@ -111,3 +114,51 @@ which is the fastest way to tell a missing key from a dead network.
 The answer is cached in `~fpp/.cache/fpp-onthisday/YYYY-MM-DD.json` and kept for
 14 days. Deleting today's file forces a rebuild on the next refresh; that is the
 only way to make the service call the API twice in one day.
+
+## The weekly fppd recycle
+
+`fpp-fppd-recycle.timer` bounces `fppd` every **Tuesday at 04:00**.
+
+It is not housekeeping — without it the panel eventually goes **black** with no
+error anywhere except one line in `fppd.log`:
+
+```
+Playlist.cpp:447: Playlist fpp-scoreboard is invalid: Resource temporarily unavailable
+```
+
+`fppd` is a **32-bit ARM binary** (~3 GB of address space), and
+`PlaylistEntryImage::Init` spawns a thread wanting an **8 MB contiguous stack
+for every image entry**, at playlist *load* time rather than when the entry
+plays. `VmSize` grows with uptime — 2.25 GB after 27 days, with a 753 MB heap —
+until `pthread_create` returns EAGAIN, `Playlist::Load` throws, and the
+**entire playlist is discarded**. The service logs a clean cycle and the API
+still says `"playing"`, so nothing looks wrong.
+
+Measured on 2026-09-23, before and after a restart:
+
+| image entries | 27 days uptime | after restart |
+|---|---|---|
+| 12 | ok | ok |
+| 14 | **INVALID** | ok |
+| 22 (the NFL board) | **INVALID** | ok |
+| 40 | not tested | ok |
+
+`VmSize` dropped 2.25 GB → 0.49 GB across that restart. The NFL board is 19
+game cards + 3 leader cards = **22 image entries**, which is why it breaks
+first and why it looked like the intro animation was at fault. It was not.
+
+The script stops playback **before** touching `fppd` — restarting while the
+decoder holds an mp4 open is the 2026-08-16 wedge. It records whatever owned
+the panel (via `fpp-panel-ctl.sh current status`, so a sixth display service
+needs no edit here) and puts it back afterwards.
+
+Check on it with:
+
+```bash
+systemctl list-timers fpp-fppd-recycle
+sudo journalctl -u fpp-fppd-recycle | grep fppd-recycle:
+```
+
+**This is a workaround.** The real fix is a 64-bit FPP image — the box is a
+Pi 4 Model B (Cortex-A72, 3.6 GB RAM) currently running an `armv7l` kernel and
+an `armhf` userland, so the 3 GB ceiling is self-imposed.

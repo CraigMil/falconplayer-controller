@@ -1,0 +1,17 @@
+[Unit]
+Description=Weekly fppd recycle
+
+[Timer]
+# Tuesday 04:00 local. Tuesday because Monday Night Football ends around 23:30
+# and the NFL board is the one that breaks first; 04:00 because nobody is
+# looking at the panel and a ~20s gap costs nothing.
+OnCalendar=Tue *-*-* 04:00:00
+# Catch up after the device has been off — a missed recycle is the whole
+# failure mode this timer exists to prevent.
+Persistent=true
+# Do not have every FPP box in the world wake at the same instant, and do not
+# land exactly on any other 04:00 job.
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
