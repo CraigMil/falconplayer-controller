@@ -1,0 +1,113 @@
+# Ships the FPP box's logs to Loki at 192.168.1.48:3100.
+#
+# WHY: the panel going black on 2026-09-23 was explained by exactly one line,
+# in fppd.log, on the device's SD card, which nothing watched:
+#
+#   Playlist.cpp:447: Playlist fpp-scoreboard is invalid: Resource temporarily unavailable
+#
+# The display service logged a clean cycle and the API said "playing" the whole
+# time. See device/README.md.
+#
+# WHY PROMTAIL AND NOT ALLOY (which every other host here runs): Alloy ships
+# arm64 only, and this Pi 4 runs an armv7l kernel with an armhf userland, so an
+# arm64 binary cannot execute. promtail still publishes promtail-linux-arm
+# (through v3.6.11; v3.7.x dropped it). promtail is deprecated in favour of
+# Alloy — when this box is reimaged 64-bit, replace this with Alloy and use
+# /etc/alloy/config.alloy on 192.168.1.71 as the template.
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  # The default (info) narrates every file it tails on every sync. Only real
+  # problems are worth putting in this box's own journal.
+  log_level: warn
+
+positions:
+  filename: /var/lib/promtail/positions.yaml
+
+clients:
+  - url: http://192.168.1.48:3100/loki/api/v1/push
+
+scrape_configs:
+  # ------------------------------------------------------------------ fppd.log
+  # Low volume: 2,282 lines in the five weeks to 2026-09-23, ~95% of them
+  # "MQTT Publishing command" from [Command]. Cheap to ship in full.
+  - job_name: fppd
+    static_configs:
+      - targets: [localhost]
+        labels:
+          host: fpp
+          job: fppd
+          __path__: /home/fpp/media/logs/fppd.log
+
+    pipeline_stages:
+      # 2026-09-23 18:22:58.067 (1684) [Playlist] /opt/fpp/src/playlist/Playlist.cpp:447: <message>
+      - regex:
+          expression: '^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}) \((?P<pid>\d+)\) \[(?P<channel>[A-Za-z]+)\] (?P<src>[^:]+):(?P<srcline>\d+): (?P<msg>.*)$'
+
+      # Use fppd's own clock, not ingest time. It logs local time with no zone,
+      # so the zone has to be stated or every line lands 7-8 hours out.
+      - timestamp:
+          source: ts
+          format: '2006-01-02 15:04:05.000'
+          location: America/Los_Angeles
+
+      # channel has exactly five values in five weeks of log — Command, General,
+      # Control, Playlist, Schedule — so it is safe as a label and makes
+      # {host="fpp", channel="Playlist"} a fast, tiny stream. That is the one
+      # that carries the load failures.
+      #
+      # Deliberately NOT labelling src/srcline/pid: src alone is ~40 values and
+      # pid is unbounded, and unbounded labels are how you wreck a Loki index.
+      - labels:
+          channel:
+
+      # promtail reads a new file from the START, and this log is not rotated
+      # per run — it goes back to 2026-08-16. Without this the first start
+      # replays five weeks of history into Loki at their original timestamps.
+      # Must come AFTER the timestamp stage, since it compares the parsed time.
+      - drop:
+          older_than: 2h
+          drop_counter_reason: log_rotation_replay
+
+  # ------------------------------------------------------------------- journal
+  # The display services (fpp-nfl, fpp-whatson, fpp-onthisday, ...) and the
+  # weekly fpp-fppd-recycle job log here and nowhere else.
+  - job_name: journal
+    journal:
+      # /run/log/journal, NOT /var/log/journal. FPP ships
+      # `Storage=volatile` in /etc/systemd/journald.conf to spare the SD card,
+      # so the journal lives on tmpfs and /var/log/journal is an empty leftover
+      # directory. Pointed there, promtail runs happily and reads nothing —
+      # promtail_journal_target_lines_total stays at 0 with no error logged.
+      #
+      # Volatile also means the journal does NOT survive a reboot, which is a
+      # second reason to ship it: Loki becomes the only durable copy of what
+      # the display services and the weekly recycle actually did.
+      path: /run/log/journal
+      max_age: 12h
+      labels:
+        host: fpp
+        job: systemd-journal
+
+    relabel_configs:
+      - source_labels: ['__journal__systemd_unit']
+        target_label: unit
+
+      # Every SSH login mints its own session-<N>.scope, and this box is
+      # administered over SSH — so `unit` would grow without bound and each
+      # value would carry a handful of lines. Unbounded labels are how a Loki
+      # index gets wrecked; collapse them all into one stream.
+      - source_labels: ['unit']
+        regex: 'session-\d+\.scope'
+        target_label: 'unit'
+        replacement: 'user-session.scope'
+
+      # Same shape, different source: per-UID user manager units.
+      - source_labels: ['unit']
+        regex: 'user@\d+\.service'
+        target_label: 'unit'
+        replacement: 'user-manager.service'
+
+      - source_labels: ['__journal_priority_keyword']
+        target_label: level

@@ -1,0 +1,22 @@
+[Unit]
+Description=Promtail — ship FPP logs to Loki
+Documentation=file:/etc/promtail/config.yml
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Root because it reads /var/log/journal and writes /var/lib/promtail.
+User=root
+ExecStart=/usr/local/bin/promtail -config.file=/etc/promtail/config.yml
+Restart=on-failure
+RestartSec=10
+
+# This box exists to drive the LED panel. A log shipper must never be the
+# reason fppd stutters, so it runs behind everything else.
+Nice=10
+IOSchedulingClass=idle
+MemoryMax=200M
+
+[Install]
+WantedBy=multi-user.target
