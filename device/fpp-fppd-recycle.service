@@ -1,0 +1,13 @@
+[Unit]
+Description=Recycle fppd to reclaim 32-bit address space
+Documentation=file:/home/fpp/fpp-fppd-recycle.sh
+After=network-online.target fppd.service
+
+[Service]
+Type=oneshot
+# Root, not fpp: this stops and starts units directly. Deliberately NOT given a
+# sudoers file like fpp-nfl and fpp-whatson have — nothing but the timer should
+# be able to bounce fppd, so there is no reason to widen the fpp user's rights.
+User=root
+ExecStart=/home/fpp/fpp-fppd-recycle.sh
+TimeoutStartSec=300
